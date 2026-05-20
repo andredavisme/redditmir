@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RedditMirror — Ingest Posts</title>
+  <style>
+    body { font-family: monospace; max-width: 600px; margin: 60px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }
+    h1 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 4px; }
+    p  { color: #8b949e; font-size: 0.85rem; margin: 0 0 24px; }
+    button {
+      background: #238636; color: #fff; border: none; padding: 12px 24px;
+      font-size: 1rem; font-family: monospace; border-radius: 6px;
+      cursor: pointer; width: 100%;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    #log {
+      margin-top: 24px; background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; padding: 16px; min-height: 80px;
+      font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap;
+    }
+    .ok  { color: #3fb950; }
+    .err { color: #f85149; }
+    .inf { color: #8b949e; }
+  </style>
+</head>
+<body>
+  <h1>RedditMirror — Ingest r/Maine Posts</h1>
+  <p>Opens Reddit in a popup, fetches /new, sends posts to the ingest function.</p>
+
+  <button id="btn" onclick="run()">&#9654; Fetch &amp; Ingest r/Maine/new</button>
+  <div id="log"><span class="inf">Ready. Click the button to begin.</span></div>
+
+  <script>
+    const INGEST_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';
+    const REDDIT_URL = 'https://www.reddit.com/r/Maine/new.json?limit=100&raw_json=1';
+
+    function log(msg, type = 'inf') {
+      const el = document.getElementById('log');
+      el.innerHTML += `<span class="${type}">${msg}</span>\n`;
+    }
+
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+    }
+
+    async function run() {
+      const btn = document.getElementById('btn');
+      btn.disabled = true;
+      clearLog();
+
+      // Step 1: Open Reddit in a popup window so it loads with your session
+      // The popup fetches the JSON and sends it back via postMessage
+      log('Opening Reddit popup...', 'inf');
+
+      const popup = window.open(
+        'about:blank',
+        'reddit-fetcher',
+        'width=800,height=600'
+      );
+
+      if (!popup) {
+        log('Popup was blocked! Allow popups for this page and try again.', 'err');
+        btn.disabled = false;
+        return;
+      }
+
+      // Inject a script into the popup that fetches Reddit then postMessages results back
+      popup.document.write(`
+        <script>
+          fetch('${REDDIT_URL}', {credentials:'include'})
+            .then(r => r.json())
+            .then(data => {
+              window.opener.postMessage({type:'REDDIT_DATA', data}, '*');
+              window.close();
+            })
+            .catch(err => {
+              window.opener.postMessage({type:'REDDIT_ERROR', error: err.message}, '*');
+              window.close();
+            });
+        <\/script>
+        <p style="font-family:monospace;padding:20px">Fetching r/Maine/new... this window will close automatically.</p>
+      `);
+      popup.document.close();
+
+      // Step 2: Wait for postMessage from the popup
+      const result = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for popup')), 15000);
+        window.addEventListener('message', function handler(e) {
+          if (e.data?.type === 'REDDIT_DATA' || e.data?.type === 'REDDIT_ERROR') {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            if (e.data.type === 'REDDIT_ERROR') reject(new Error(e.data.error));
+            else resolve(e.data.data);
+          }
+        });
+      }).catch(err => { log('Reddit fetch failed: ' + err.message, 'err'); btn.disabled = false; return null; });
+
+      if (!result) return;
+
+      const children = result?.data?.children;
+      if (!children || children.length === 0) {
+        log('No posts found in r/Maine/new.', 'err');
+        btn.disabled = false;
+        return;
+      }
+
+      const posts = children.map(c => c.data);
+      log(`Fetched ${posts.length} posts from Reddit.`, 'ok');
+
+      // Step 3: POST to ingest-posts (no CSP here, this is a local file)
+      log('Sending to ingest-posts...', 'inf');
+      try {
+        const res = await fetch(INGEST_URL, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({posts})
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || res.statusText);
+        log(`\u2714 Ingested ${json.ingested} posts!`, 'ok');
+        log(`Newest cursor: ${json.newest_cursor}`, 'inf');
+      } catch (err) {
+        log('Ingest failed: ' + err.message, 'err');
+      }
+
+      btn.disabled = false;
+    }
+  </script>
+</body>
+</html>
