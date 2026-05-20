@@ -2,24 +2,28 @@
  * Reddit Listing Extractor Bookmarklet
  * =====================================
  * PURPOSE:
- *   Fetches the latest posts from r/Maine/new and sends them to the
- *   RedditMirror ingest-posts edge function.
+ *   Fetches the latest posts from r/Maine/new and copies them to the
+ *   clipboard as JSON. Then open tools/ingest.html locally and paste
+ *   to send them to the RedditMirror ingest-posts edge function.
  *
  * HOW TO INSTALL:
  *   1. Create a new bookmark in your browser
- *   2. Set the name to: r/Maine → Mirror
+ *   2. Set the name to: r/Maine → Copy
  *   3. Paste the minified version (see docs/bookmarklets.md) as the URL
  *   4. Save to bookmarks bar
  *
  * HOW TO RUN:
  *   1. Go to reddit.com/r/Maine/new (must be logged in)
  *   2. Click the bookmark
- *   3. Alert will confirm how many posts were ingested
+ *   3. Alert confirms posts copied to clipboard
+ *   4. Open tools/ingest.html locally and click "Paste & Ingest"
  *
- * DEPENDENCIES:
- *   - ingest-posts edge function must be deployed
- *   - INGEST_URL below must match your Supabase project URL
- *   - Must be run from a Reddit page (cookies needed for fetch)
+ * WHY TWO STEPS:
+ *   Reddit enforces a Content Security Policy (connect-src) that blocks
+ *   outbound fetch() to non-Reddit domains. The bookmarklet can fetch
+ *   Reddit JSON fine, but cannot POST to Supabase from within the Reddit
+ *   tab. Copying to clipboard and finishing in a local HTML file (no CSP)
+ *   is the clean workaround.
  *
  * SWAP OUT WHEN:
  *   - Reddit OAuth is approved → switch to poll-source with REDDIT_FETCH_METHOD=oauth
@@ -27,19 +31,15 @@
  */
 
 (async function () {
-  // ============================================================
-  // CONFIG — update INGEST_URL if project changes
-  // ============================================================
-  const INGEST_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';
-  const SUBREDDIT = 'Maine';   // change to mirror a different subreddit
-  const LIMIT = 100;           // max posts per run (Reddit max: 100)
+  const SUBREDDIT = 'Maine';
+  const LIMIT = 100;
 
   try {
-    // Step 1: Fetch listing from Reddit using browser session (bypasses datacenter IP block)
+    // Fetch listing from Reddit using browser session (bypasses datacenter IP block)
     const res = await fetch(
       `https://www.reddit.com/r/${SUBREDDIT}/new.json?limit=${LIMIT}&raw_json=1`,
       {
-        credentials: 'include',       // sends your Reddit session cookies
+        credentials: 'include',
         headers: { 'Accept': 'application/json' },
       }
     );
@@ -54,29 +54,15 @@
       return;
     }
 
-    // Step 2: Extract post data objects from the Reddit listing children
-    // Each child has { kind: 't3', data: { ...post fields... } }
-    // raw_json=1 decodes HTML entities in titles/selftext automatically
     const posts = children.map((c) => c.data);
 
-    // Step 3: POST to ingest-posts edge function
-    const ingestRes = await fetch(INGEST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posts }),
-    });
-
-    if (!ingestRes.ok) {
-      const err = await ingestRes.text();
-      throw new Error('Ingest failed: ' + err);
-    }
-
-    const result = await ingestRes.json();
+    // Copy posts JSON to clipboard — no Supabase POST here (blocked by Reddit CSP)
+    await navigator.clipboard.writeText(JSON.stringify(posts));
 
     alert(
       'RedditMirror \u2714\ufe0f\n' +
-      'Ingested ' + result.ingested + ' posts from r/' + SUBREDDIT + '\n' +
-      'Newest cursor: ' + result.newest_cursor
+      posts.length + ' posts copied to clipboard.\n\n' +
+      'Now open tools/ingest.html and click "Paste & Ingest".'
     );
 
   } catch (err) {

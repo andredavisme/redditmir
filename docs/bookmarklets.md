@@ -8,7 +8,7 @@ Bookmarklets are browser-based tools that run JavaScript on the current page whe
 
 | Situation | Method |
 |---|---|
-| Reddit API not yet approved | **Browser bookmarklet** (current) |
+| Reddit API not yet approved | **Two-step browser ingest** (current) |
 | Reddit OAuth approved | `poll-source` edge function |
 | OAuth blocked, want automation | RSS feed adapter |
 
@@ -16,38 +16,53 @@ See `REDDIT_FETCH_METHOD` in `docs/dev-log.md` for switching instructions.
 
 ---
 
-## Bookmarklet 1: Reddit Listing Extractor
+## Why Two Steps?
 
-**Purpose:** Visit `r/Maine/new`, click this bookmarklet, and it will fetch the latest posts and send them directly to the `ingest-posts` edge function.
+Reddit enforces a **Content Security Policy (CSP)** on all its pages that blocks outbound `fetch()` calls to non-Reddit domains. This means a bookmarklet running on reddit.com can fetch Reddit JSON fine, but **cannot POST to Supabase** from within the Reddit tab.
 
-**When to use:** Any time you want to sync new posts from r/Maine into the pipeline. Run this instead of waiting for automated polling.
-
-**What it does:**
-1. Fetches `r/Maine/new.json?limit=100` from your browser session (no IP block)
-2. Extracts all post fields that map to `source_posts`
-3. POSTs the array to `ingest-posts`
-4. Alerts you with how many posts were ingested
-
-**How to install:**
-1. Create a new bookmark in your browser (any page)
-2. Set the name to: `r/Maine → Mirror`
-3. Set the URL to the full bookmarklet code below
-4. Save it to your bookmarks bar
-
-**How to run:**
-1. Go to [reddit.com/r/Maine/new](https://www.reddit.com/r/Maine/new) (logged in)
-2. Click the bookmarklet in your bookmarks bar
-3. Wait for the alert confirming how many posts were ingested
+The solution:
+- **Bookmarklet** handles the Reddit fetch (needs session cookies, no CSP issue for reading)
+- **`tools/ingest.html`** (local file) handles the Supabase POST (no CSP at all on local files)
+- Data is passed between the two steps via the **clipboard**
 
 ---
+
+## Bookmarklet: Reddit Listing Extractor
+
+**Purpose:** Visit `r/Maine/new`, click this bookmarklet, and it copies the latest posts as JSON to your clipboard.
+
+**Step 1 of 2** — then open `tools/ingest.html` to complete the ingest.
+
+### How to Install
+1. Create a new bookmark in your browser (any page)
+2. Set the name to: `r/Maine → Copy`
+3. Set the URL to the minified bookmarklet code below
+4. Save it to your bookmarks bar
+
+### How to Run
+1. Go to [reddit.com/r/Maine/new](https://www.reddit.com/r/Maine/new) (logged in)
+2. Click the **`r/Maine → Copy`** bookmarklet
+3. Alert confirms how many posts were copied to clipboard
+4. Open `tools/ingest.html` locally
+5. Click **Paste & Ingest**
 
 ### Bookmarklet Code
 
 Copy the entire block below (one line) and paste it as the URL of a new bookmark:
 
 ```
-javascript:(async function(){const INGEST_URL='https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';try{const res=await fetch('https://www.reddit.com/r/Maine/new.json?limit=100&raw_json=1',{credentials:'include',headers:{'Accept':'application/json'}});if(!res.ok)throw new Error('Reddit fetch failed: HTTP '+res.status);const data=await res.json();const children=data?.data?.children;if(!children||children.length===0){alert('RedditMirror: No posts found.');return;}const posts=children.map(c=>c.data);const ingestRes=await fetch(INGEST_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({posts})});if(!ingestRes.ok){const err=await ingestRes.text();throw new Error('Ingest failed: '+err);}const result=await ingestRes.json();alert('RedditMirror \u2714\ufe0f\nIngested '+result.ingested+' posts from r/Maine\nNewest cursor: '+result.newest_cursor);}catch(err){alert('RedditMirror Error:\n'+err.message);}})();
+javascript:(async function(){const SUBREDDIT='Maine';const LIMIT=100;try{const res=await fetch(`https://www.reddit.com/r/${SUBREDDIT}/new.json?limit=${LIMIT}&raw_json=1`,{credentials:'include',headers:{'Accept':'application/json'}});if(!res.ok)throw new Error('Reddit fetch failed: HTTP '+res.status);const data=await res.json();const children=data?.data?.children;if(!children||children.length===0){alert('RedditMirror: No posts found in r/'+SUBREDDIT+'/new.');return;}const posts=children.map(c=>c.data);await navigator.clipboard.writeText(JSON.stringify(posts));alert('RedditMirror \u2714\ufe0f\n'+posts.length+' posts copied to clipboard.\n\nNow open tools/ingest.html and click "Paste & Ingest".');}catch(err){alert('RedditMirror Error:\n'+err.message);}})();
 ```
+
+---
+
+## tools/ingest.html
+
+**Step 2 of 2** — open this file locally in your browser after running the bookmarklet.
+
+- Click **Paste** to pull from clipboard automatically, or paste manually with Ctrl+V
+- Click **Ingest Posts** to send to the `ingest-posts` edge function
+- The log confirms how many posts were ingested and the newest cursor saved
 
 ---
 
@@ -55,15 +70,13 @@ javascript:(async function(){const INGEST_URL='https://hhyhulqngdkwsxhymmcd.supa
 
 **Purpose:** Extract a single Reddit thread (post + all comments) and copy to clipboard. Used for manual review or one-off imports.
 
-**When to use:** When you want to inspect a specific post's full comment thread, or manually import a single post.
-
 See `reddit-extract.txt` in project files for the original bookmarklet code.
 
 ---
 
 ## Switching to Automated Polling (when Reddit approves)
 
-When Reddit OAuth is approved, you no longer need the bookmarklet for regular syncing. Switch methods:
+When Reddit OAuth is approved, you no longer need the bookmarklet for regular syncing:
 
 1. Go to Supabase Dashboard → Edge Functions → `poll-source` → Secrets
 2. Set `REDDIT_FETCH_METHOD` = `oauth`
