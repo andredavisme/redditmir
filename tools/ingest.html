@@ -6,6 +6,7 @@
   <style>
     body { font-family: monospace; max-width: 680px; margin: 60px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }
     h1 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 4px; }
+    h2 { color: #58a6ff; font-size: 1rem; margin: 32px 0 8px; border-top: 1px solid #21262d; padding-top: 24px; }
     p  { color: #8b949e; font-size: 0.85rem; margin: 0 0 16px; }
     ol { color: #8b949e; font-size: 0.85rem; margin: 0 0 20px; padding-left: 20px; line-height: 1.8; }
     textarea {
@@ -27,10 +28,14 @@
     button:disabled { background: #444; cursor: not-allowed; }
     #btn-paste { background: #1f6feb; flex: 0 0 auto; padding: 12px 16px; }
     #btn-paste:hover { background: #388bfd; }
-    #log {
+    #btn-transform { background: #6e40c9; }
+    #btn-transform:hover { background: #8957e5; }
+    #btn-transform:disabled { background: #444; }
+    .log-section {
       background: #161b22; border: 1px solid #30363d;
-      border-radius: 6px; padding: 16px; min-height: 80px;
+      border-radius: 6px; padding: 16px; min-height: 60px;
       font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap;
+      margin-bottom: 8px;
     }
     .ok  { color: #3fb950; }
     .err { color: #f85149; }
@@ -39,6 +44,8 @@
 </head>
 <body>
   <h1>RedditMirror — Ingest r/Maine Posts</h1>
+
+  <h2>Step 1 — Ingest Posts</h2>
   <ol>
     <li>Go to <a href="https://www.reddit.com/r/Maine/new" target="_blank" style="color:#58a6ff">reddit.com/r/Maine/new</a> (logged in)</li>
     <li>Click the <strong>r/Maine → Copy</strong> bookmarklet</li>
@@ -49,21 +56,27 @@
     <button id="btn-ingest" onclick="ingest()" disabled>&#9654; Ingest Posts</button>
     <button id="btn-paste" onclick="pasteFromClipboard()">&#128203; Paste</button>
   </div>
-
   <textarea id="json-input" placeholder="Paste Reddit posts JSON here (or use the Paste button above)..." oninput="onInput()"></textarea>
+  <div id="log-ingest" class="log-section"><span class="inf">Ready. Paste your clipboard JSON and click Ingest.</span></div>
 
-  <div id="log"><span class="inf">Ready. Paste your clipboard JSON and click Ingest.</span></div>
+  <h2>Step 2 — Transform Posts</h2>
+  <p>Filters ingested source posts (removes NSFW/spoilers, deduplicates) and queues eligible posts for moderator approval.</p>
+  <div class="btn-row">
+    <button id="btn-transform" onclick="transform()">&#9654; Run transform-posts</button>
+  </div>
+  <div id="log-transform" class="log-section"><span class="inf">Ready. Run after ingesting posts.</span></div>
 
   <script>
-    const INGEST_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';
+    const INGEST_URL    = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';
+    const TRANSFORM_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/transform-posts';
 
-    function log(msg, type = 'inf') {
-      const el = document.getElementById('log');
+    function log(targetId, msg, type = 'inf') {
+      const el = document.getElementById(targetId);
       el.innerHTML += `<span class="${type}">${msg}</span>\n`;
     }
 
-    function clearLog() {
-      document.getElementById('log').innerHTML = '';
+    function clearLog(targetId) {
+      document.getElementById(targetId).innerHTML = '';
     }
 
     function onInput() {
@@ -76,25 +89,25 @@
         const text = await navigator.clipboard.readText();
         document.getElementById('json-input').value = text;
         onInput();
-        clearLog();
-        log('Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
+        clearLog('log-ingest');
+        log('log-ingest', 'Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
       } catch (err) {
-        log('Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
+        log('log-ingest', 'Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
       }
     }
 
     async function ingest() {
       const btn = document.getElementById('btn-ingest');
       btn.disabled = true;
-      clearLog();
+      clearLog('log-ingest');
 
       let posts;
       try {
         posts = JSON.parse(document.getElementById('json-input').value.trim());
         if (!Array.isArray(posts)) throw new Error('Expected a JSON array of posts.');
-        log(`Parsed ${posts.length} posts. Sending to ingest-posts...`, 'inf');
+        log('log-ingest', `Parsed ${posts.length} posts. Sending to ingest-posts...`, 'inf');
       } catch (err) {
-        log('Invalid JSON: ' + err.message, 'err');
+        log('log-ingest', 'Invalid JSON: ' + err.message, 'err');
         btn.disabled = false;
         return;
       }
@@ -107,11 +120,32 @@
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || res.statusText);
-        log(`\u2714 Ingested ${json.ingested} posts!`, 'ok');
-        log(`Newest cursor: ${json.newest_cursor}`, 'inf');
-        log(`Run transform-posts next to push eligible posts into the approval queue.`, 'inf');
+        log('log-ingest', `\u2714 Ingested ${json.ingested} posts!`, 'ok');
+        log('log-ingest', `Newest cursor: ${json.newest_cursor}`, 'inf');
+        log('log-ingest', `\u2192 Run transform-posts below to queue eligible posts.`, 'inf');
       } catch (err) {
-        log('Ingest failed: ' + err.message, 'err');
+        log('log-ingest', 'Ingest failed: ' + err.message, 'err');
+      }
+
+      btn.disabled = false;
+    }
+
+    async function transform() {
+      const btn = document.getElementById('btn-transform');
+      btn.disabled = true;
+      clearLog('log-transform');
+      log('log-transform', 'Running transform-posts...', 'inf');
+
+      try {
+        const res = await fetch(TRANSFORM_URL, { method: 'POST' });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || res.statusText);
+        log('log-transform', `\u2714 ${json.message}`, 'ok');
+        if (json.filtered > 0) {
+          log('log-transform', `${json.filtered} posts filtered (NSFW or spoiler).`, 'inf');
+        }
+      } catch (err) {
+        log('log-transform', 'transform-posts failed: ' + err.message, 'err');
       }
 
       btn.disabled = false;
