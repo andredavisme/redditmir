@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>RedditMirror — Ingest Posts</title>
+  <title>RedditMirror &mdash; Ingest Posts</title>
   <style>
     body { font-family: monospace; max-width: 680px; margin: 60px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }
     h1 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 4px; }
@@ -42,8 +42,6 @@
     .ok  { color: #3fb950; }
     .err { color: #f85149; }
     .inf { color: #8b949e; }
-
-    /* Step 3 post cards */
     #post-list { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
     .post-card {
       background: #161b22; border: 1px solid #30363d;
@@ -59,18 +57,18 @@
     .btn-approve { background: #238636; }
     .btn-approve:hover { background: #2ea043; }
     .btn-reject  { background: #b62324; }
-    .btn-reject:hover  { background: #f85149; }
+    .btn-reject:hover { background: #f85149; }
     .btn-approve:disabled, .btn-reject:disabled { background: #444; }
     #queue-summary { color: #8b949e; font-size: 0.85rem; margin-bottom: 4px; min-height: 20px; }
   </style>
 </head>
 <body>
-  <h1>RedditMirror — Ingest r/Maine Posts</h1>
+  <h1>RedditMirror &mdash; Ingest r/Maine Posts</h1>
 
-  <h2>Step 1 — Ingest Posts</h2>
+  <h2>Step 1 &mdash; Ingest Posts</h2>
   <ol>
     <li>Go to <a href="https://www.reddit.com/r/Maine/new" target="_blank" style="color:#58a6ff">reddit.com/r/Maine/new</a> (logged in)</li>
-    <li>Click the <strong>r/Maine → Copy</strong> bookmarklet</li>
+    <li>Click the <strong>r/Maine &rarr; Copy</strong> bookmarklet</li>
     <li>Come back here and click <strong>Paste &amp; Ingest</strong></li>
   </ol>
 
@@ -81,14 +79,14 @@
   <textarea id="json-input" placeholder="Paste Reddit posts JSON here (or use the Paste button above)..." oninput="onInput()"></textarea>
   <div id="log-ingest" class="log-section"><span class="inf">Ready. Paste your clipboard JSON and click Ingest.</span></div>
 
-  <h2>Step 2 — Transform Posts</h2>
+  <h2>Step 2 &mdash; Transform Posts</h2>
   <p>Filters ingested source posts (removes NSFW/spoilers, deduplicates) and queues eligible posts for moderator approval.</p>
   <div class="btn-row">
     <button id="btn-transform" onclick="transform()">&#9654; Run transform-posts</button>
   </div>
   <div id="log-transform" class="log-section"><span class="inf">Ready. Run after ingesting posts.</span></div>
 
-  <h2>Step 3 — Review &amp; Approve Posts</h2>
+  <h2>Step 3 &mdash; Review &amp; Approve Posts</h2>
   <p>Approve or reject each pending post before it gets delivered to Reddit Mirror.</p>
   <div class="btn-row">
     <button id="btn-load-queue" onclick="loadQueue()">&#8635; Load Pending Posts</button>
@@ -97,15 +95,15 @@
   <div id="post-list"></div>
 
   <script>
-    const SUPABASE_URL   = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
-    const ANON_KEY       = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI4ODA3MTgsImV4cCI6MjAzODQ1NjcxOH0.BWPBW4v6jSRFbMVbdJtZfzqPm0VaxYIyMFlnBi6eFWk';
-    const INGEST_URL    = `${SUPABASE_URL}/functions/v1/ingest-posts`;
-    const TRANSFORM_URL = `${SUPABASE_URL}/functions/v1/transform-posts`;
+    var SUPABASE_URL   = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
+    var ANON_KEY       = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI4ODA3MTgsImV4cCI6MjAzODQ1NjcxOH0.BWPBW4v6jSRFbMVbdJtZfzqPm0VaxYIyMFlnBi6eFWk';
+    var INGEST_URL     = SUPABASE_URL + '/functions/v1/ingest-posts';
+    var TRANSFORM_URL  = SUPABASE_URL + '/functions/v1/transform-posts';
 
-    function log(targetId, msg, type = 'inf') {
-      const el = document.getElementById(targetId);
-      el.innerHTML += `<span class="${type}">${msg}</span>
-`;
+    function log(targetId, msg, type) {
+      if (!type) type = 'inf';
+      var el = document.getElementById(targetId);
+      el.innerHTML += '<span class="' + type + '">' + msg + '</span>\n';
     }
 
     function clearLog(targetId) {
@@ -113,161 +111,145 @@
     }
 
     function onInput() {
-      const val = document.getElementById('json-input').value.trim();
+      var val = document.getElementById('json-input').value.trim();
       document.getElementById('btn-ingest').disabled = val.length === 0;
     }
 
     async function pasteFromClipboard() {
       try {
-        const text = await navigator.clipboard.readText();
+        var text = await navigator.clipboard.readText();
         document.getElementById('json-input').value = text;
         onInput();
         clearLog('log-ingest');
         log('log-ingest', 'Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
       } catch (err) {
-        log('log-ingest', 'Clipboard read failed: ' + err.message + '
-Try pasting manually with Ctrl+V.', 'err');
+        log('log-ingest', 'Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
       }
     }
 
     async function ingest() {
-      const btn = document.getElementById('btn-ingest');
+      var btn = document.getElementById('btn-ingest');
       btn.disabled = true;
       clearLog('log-ingest');
-
-      let posts;
+      var posts;
       try {
         posts = JSON.parse(document.getElementById('json-input').value.trim());
         if (!Array.isArray(posts)) throw new Error('Expected a JSON array of posts.');
-        log('log-ingest', `Parsed ${posts.length} posts. Sending to ingest-posts...`, 'inf');
+        log('log-ingest', 'Parsed ' + posts.length + ' posts. Sending to ingest-posts...', 'inf');
       } catch (err) {
         log('log-ingest', 'Invalid JSON: ' + err.message, 'err');
         btn.disabled = false;
         return;
       }
-
       try {
-        const res = await fetch(INGEST_URL, {
+        var res = await fetch(INGEST_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ posts }),
+          body: JSON.stringify({ posts: posts })
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || res.statusText);
-        log('log-ingest', `✔ Ingested ${json.ingested} posts!`, 'ok');
-        log('log-ingest', `Newest cursor: ${json.newest_cursor}`, 'inf');
-        log('log-ingest', `→ Run transform-posts below to queue eligible posts.`, 'inf');
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        log('log-ingest', '\u2714 Ingested ' + data.ingested + ' posts!', 'ok');
+        log('log-ingest', 'Newest cursor: ' + data.newest_cursor, 'inf');
+        log('log-ingest', '\u2192 Run transform-posts below to queue eligible posts.', 'inf');
       } catch (err) {
         log('log-ingest', 'Ingest failed: ' + err.message, 'err');
       }
-
       btn.disabled = false;
     }
 
     async function transform() {
-      const btn = document.getElementById('btn-transform');
+      var btn = document.getElementById('btn-transform');
       btn.disabled = true;
       clearLog('log-transform');
       log('log-transform', 'Running transform-posts...', 'inf');
-
       try {
-        const res = await fetch(TRANSFORM_URL, { method: 'POST' });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || res.statusText);
-        log('log-transform', `✔ ${json.message}`, 'ok');
-        if (json.filtered > 0) {
-          log('log-transform', `${json.filtered} posts filtered (NSFW or spoiler).`, 'inf');
+        var res = await fetch(TRANSFORM_URL, { method: 'POST' });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        log('log-transform', '\u2714 ' + data.message, 'ok');
+        if (data.filtered > 0) {
+          log('log-transform', data.filtered + ' posts filtered (NSFW or spoiler).', 'inf');
         }
-        log('log-transform', `→ Scroll to Step 3 and click Load Pending Posts.`, 'inf');
+        log('log-transform', '\u2192 Scroll to Step 3 and click Load Pending Posts.', 'inf');
       } catch (err) {
         log('log-transform', 'transform-posts failed: ' + err.message, 'err');
       }
-
       btn.disabled = false;
     }
 
-    // ── Step 3: Approval Queue ─────────────────────────────────────────────
-
     async function loadQueue() {
-      const btn = document.getElementById('btn-load-queue');
+      var btn = document.getElementById('btn-load-queue');
       btn.disabled = true;
       document.getElementById('queue-summary').textContent = 'Loading...';
       document.getElementById('post-list').innerHTML = '';
-
       try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/synced_posts?status=eq.pending&select=id,source_post_id,source_posts(title,url,author,score,flair_text)&order=id.asc`,
-          { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
+        var res = await fetch(
+          SUPABASE_URL + '/rest/v1/synced_posts?status=eq.pending&select=id,source_post_id,source_posts(title,url,author,score,flair_text)&order=id.asc',
+          { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
         );
         if (!res.ok) throw new Error(await res.text());
-        const posts = await res.json();
-
-        const summary = document.getElementById('queue-summary');
+        var posts = await res.json();
+        var summary = document.getElementById('queue-summary');
         if (posts.length === 0) {
-          summary.innerHTML = '<span style="color:#3fb950">✔ No pending posts — queue is clear.</span>';
+          summary.innerHTML = '<span style="color:#3fb950">\u2714 No pending posts &mdash; queue is clear.</span>';
           btn.disabled = false;
           return;
         }
-
-        summary.textContent = `${posts.length} post${posts.length !== 1 ? 's' : ''} pending approval`;
-
-        const listEl = document.getElementById('post-list');
-        listEl.innerHTML = posts.map(p => {
-          const sp = p.source_posts ?? {};
-          const flair = sp.flair_text ? `<span style="background:#21262d;padding:2px 6px;border-radius:4px;">${sp.flair_text}</span>` : '';
-          return `
-            <div class="post-card" id="card-${p.id}">
-              <strong><a href="${sp.url ?? '#'}" target="_blank">${sp.title ?? '(no title)'}</a></strong>
-              <div class="post-meta">u/${sp.author ?? '?'} &nbsp;·&nbsp; score: ${sp.score ?? '?'} &nbsp;·&nbsp; ${flair || 'no flair'}</div>
-              <div class="card-actions">
-                <button class="btn-approve" id="approve-${p.id}" onclick="setStatus('${p.id}', 'approved')">✅ Approve</button>
-                <button class="btn-reject"  id="reject-${p.id}"  onclick="setStatus('${p.id}', 'rejected')">❌ Reject</button>
-              </div>
-            </div>`;
-        }).join('');
-
+        summary.textContent = posts.length + ' post' + (posts.length !== 1 ? 's' : '') + ' pending approval';
+        var html = '';
+        for (var i = 0; i < posts.length; i++) {
+          var p  = posts[i];
+          var sp = p.source_posts || {};
+          var flair = sp.flair_text
+            ? '<span style="background:#21262d;padding:2px 6px;border-radius:4px;">' + sp.flair_text + '</span>'
+            : 'no flair';
+          html += '<div class="post-card" id="card-' + p.id + '">' +
+            '<strong><a href="' + (sp.url || '#') + '" target="_blank">' + (sp.title || '(no title)') + '</a></strong>' +
+            '<div class="post-meta">u/' + (sp.author || '?') + ' &nbsp;&middot;&nbsp; score: ' + (sp.score || '?') + ' &nbsp;&middot;&nbsp; ' + flair + '</div>' +
+            '<div class="card-actions">' +
+            '<button class="btn-approve" id="approve-' + p.id + '" onclick="setStatus(\'' + p.id + '\', \'approved\')">&#9989; Approve</button>' +
+            '<button class="btn-reject"  id="reject-'  + p.id + '" onclick="setStatus(\'' + p.id + '\', \'rejected\')">&#10060; Reject</button>' +
+            '</div></div>';
+        }
+        document.getElementById('post-list').innerHTML = html;
       } catch (err) {
-        document.getElementById('queue-summary').innerHTML = `<span class="err">Failed to load queue: ${err.message}</span>`;
+        document.getElementById('queue-summary').innerHTML = '<span class="err">Failed to load queue: ' + err.message + '</span>';
       }
-
       btn.disabled = false;
     }
 
     async function setStatus(id, status) {
-      const approveBtn = document.getElementById(`approve-${id}`);
-      const rejectBtn  = document.getElementById(`reject-${id}`);
+      var approveBtn = document.getElementById('approve-' + id);
+      var rejectBtn  = document.getElementById('reject-'  + id);
       if (approveBtn) approveBtn.disabled = true;
       if (rejectBtn)  rejectBtn.disabled  = true;
-
       try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/synced_posts?id=eq.${id}`, {
+        var res = await fetch(SUPABASE_URL + '/rest/v1/synced_posts?id=eq.' + id, {
           method: 'PATCH',
           headers: {
             apikey: ANON_KEY,
-            Authorization: `Bearer ${ANON_KEY}`,
+            Authorization: 'Bearer ' + ANON_KEY,
             'Content-Type': 'application/json',
-            Prefer: 'return=minimal',
+            Prefer: 'return=minimal'
           },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status: status })
         });
         if (!res.ok) throw new Error(await res.text());
-
-        const card = document.getElementById(`card-${id}`);
+        var card = document.getElementById('card-' + id);
         if (card) {
           card.classList.add(status);
           card.querySelector('.card-actions').innerHTML =
-            `<span style="color:${status === 'approved' ? '#3fb950' : '#f85149'}">${status === 'approved' ? '✔ Approved' : '✖ Rejected'}</span>`;
+            '<span style="color:' + (status === 'approved' ? '#3fb950' : '#f85149') + '">' +
+            (status === 'approved' ? '\u2714 Approved' : '\u2716 Rejected') + '</span>';
         }
-
-        // Update summary count
-        const pending = document.querySelectorAll('.post-card:not(.approved):not(.rejected)').length;
-        const summary = document.getElementById('queue-summary');
+        var pending = document.querySelectorAll('.post-card:not(.approved):not(.rejected)').length;
+        var summary = document.getElementById('queue-summary');
         if (pending === 0) {
-          summary.innerHTML = '<span style="color:#3fb950">✔ All posts reviewed!</span>';
+          summary.innerHTML = '<span style="color:#3fb950">\u2714 All posts reviewed!</span>';
         } else {
-          summary.textContent = `${pending} post${pending !== 1 ? 's' : ''} pending approval`;
+          summary.textContent = pending + ' post' + (pending !== 1 ? 's' : '') + ' pending approval';
         }
-
       } catch (err) {
         if (approveBtn) approveBtn.disabled = false;
         if (rejectBtn)  rejectBtn.disabled  = false;
