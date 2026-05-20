@@ -2,7 +2,7 @@
 
 ## Phase 3: Data Extraction from r/Maine
 **Date:** May 20, 2026  
-**Status:** Pipeline built — blocked on Reddit OAuth API approval
+**Status:** Pipeline built. Browser ingest method active. Reddit OAuth approval pending.
 
 ---
 
@@ -43,6 +43,7 @@ Key column notes:
 - Updates `sync_jobs.last_fetched_reddit_id` with newest post fullname
 - Logs to `activity_log`
 - **Status:** Functional — blocked on Reddit 403 (datacenter IP rejection without OAuth)
+- **Activation:** Set `REDDIT_FETCH_METHOD=oauth` once Reddit credentials are stored
 
 #### `transform-posts` (v2)
 - Loads all `source_posts` for active config
@@ -64,31 +65,74 @@ Key column notes:
 - Logs to `activity_log`
 - **Status:** ✅ Deployed — correctly blocked on missing credentials
 
+#### `ingest-posts` (v2) — NEW
+- Accepts POST from browser-based tools containing `{ posts: [...] }`
+- Maps Reddit post fields to `source_posts` schema
+- Upserts rows (conflict on `reddit_id`, duplicates silently ignored)
+- Updates `sync_jobs` cursor to newest fullname
+- CORS headers on all responses + OPTIONS preflight handled
+- Logs to `activity_log`
+- **Status:** ✅ Deployed and functional
+- **Activation:** Active now as `REDDIT_FETCH_METHOD=browser`
+- **Retire when:** Reddit OAuth approved and `poll-source` takes over. Keep deployed as manual import fallback.
+
 ---
 
-### Reddit API Access — Issues Encountered
+### Fetch Method Adapter Pattern
 
-#### Problem 1: Datacenter IP Block (403)
-- Reddit's public JSON API (`reddit.com/*.json`) works from browsers and residential IPs but returns 403 from Supabase Edge Function IPs
-- **Resolution:** Must use Reddit OAuth2. Authenticated requests are allowed from any IP.
+The pipeline is designed so the data source can be swapped without touching `transform-posts` or `deliver-posts`. Three methods are supported:
 
-#### Problem 2: Reddit API Registration Required
-- Reddit now requires all apps to register via their Data API form before `reddit.com/prefs/apps` will allow app creation
-- The "create app" button silently fails with a link to the Responsible Builder Policy
-- **Resolution:** Submit request via the "submit a request" link on `reddit.com/r/reddit.com/wiki/api`
+| Method | Env Value | When to Use | Status |
+|---|---|---|---|
+| Browser tool | `browser` | Reddit API not approved | ✅ Active now |
+| Reddit OAuth | `oauth` | After API approval | ⏳ Pending |
+| RSS feed | `rss` | OAuth blocked, want automation | ⏳ Not yet built |
 
-#### Problem 3: First Submission Rejected
-- Initial submission rejected for lacking detail and not providing a source code link
-- **Resolution:** Created public GitHub repo (`github.com/andredavisme/redditmir`) and resubmitted with full description, attribution language, and GitHub URL
+To switch: update `REDDIT_FETCH_METHOD` in Supabase Edge Function secrets. No code changes needed.
 
-#### Problem 4: Bot Account Setup
-- Reddit's API registration requires a dedicated bot account with username/password verification
-- Created bot account: `u/Trick_Parfait_924`
-- **Note:** Account must not have 2FA enabled for script-type OAuth apps
+---
 
-#### Current Status
-- Second API access request submitted May 20, 2026 — awaiting approval
-- Once approved: create app at `reddit.com/prefs/apps`, obtain `client_id` + `client_secret`, run password auth curl to get `refresh_token`, store in Supabase Vault
+### Reddit API Access — Full Roadblock History
+
+#### Roadblock 1: Datacenter IP Block (403)
+- Reddit's public JSON API returns 403 from Supabase Edge Function IPs
+- **Attempted:** Direct fetch from `poll-source`
+- **Resolution path:** Must use Reddit OAuth2 or fetch from a real browser
+
+#### Roadblock 2: Reddit API Registration Required
+- Reddit now requires approval before `reddit.com/prefs/apps` allows app creation
+- The "create app" button silently fails
+- **Resolution path:** Submit request at `reddit.com/r/reddit.com/wiki/api`
+
+#### Roadblock 3: First API Request Rejected
+- Rejected for lacking detail and no source code link
+- **Resolution path:** Created public GitHub repo, resubmitted with full description
+
+#### Roadblock 4: Second API Request Rejected
+- Generic rejection citing Responsible Builder Policy with no specific reason given
+- `old.reddit.com/prefs/apps` also blocked — same wall
+- Appeal email sent May 20, 2026
+- **Resolution path:** Pivoted to browser-based ingestion while appeal is pending
+
+#### Roadblock 5: Cloudflare Worker proxy considered and ruled out
+- Cloudflare Worker IPs are also datacenter IPs — same 403 from Reddit
+- **Resolution path:** Browser fetch using user's session cookies bypasses IP block entirely
+
+#### Roadblock 6: Bookmarklet blocked by Reddit's CSP
+- Reddit enforces `connect-src` Content Security Policy preventing outbound fetch to non-Reddit domains
+- Bookmarklet could fetch Reddit JSON fine but could not POST to Supabase
+- `about:blank` tabs opened programmatically inherit the opener's CSP context
+- **Resolution path:** Local HTML file (`tools/ingest.html`) has no CSP; popup + postMessage approach attempted
+
+#### Roadblock 7: Popup fetch also failing (in progress)
+- `about:blank` popup opened from local HTML file cannot fetch Reddit with credentials
+- Reddit session cookies do not travel to blank popup context
+- **Current status:** Working on two-step solution — bookmarklet handles Reddit fetch, local tool handles Supabase POST
+
+#### Current Best Path
+- Appeal email sent to Reddit — may resolve OAuth access
+- Browser ingest solution being refined
+- Once either unblocks, full pipeline test can proceed
 
 ---
 
@@ -98,16 +142,16 @@ Key column notes:
 - **Vault functions:** `vault_decrypt_secret(secret_id)` RPC used to retrieve secrets at runtime
 - **Reddit submission type:** `kind: "link"` pointing to original `permalink` — preserves full attribution
 - **No Devvit:** Devvit only supports in-Reddit experiences; external website display requires legacy Data API
+- **CORS on ingest-posts:** All responses include CORS headers; OPTIONS preflight returns 200 explicitly
 
 ---
 
-### Next Steps (Phase 4)
-- [ ] Receive Reddit API approval
-- [ ] Create app at `reddit.com/prefs/apps` under `u/Trick_Parfait_924`
-- [ ] Run curl to get `refresh_token`
-- [ ] Store `client_secret` and `refresh_token` in Supabase Vault
-- [ ] Insert `reddit_credentials` row
-- [ ] Test full pipeline: poll → transform → approve → deliver
+### Next Steps
+- [ ] Resolve browser ingest: two-step bookmarklet+paste or postMessage approach
+- [ ] Run first successful end-to-end ingest → transform → approve → deliver test
+- [ ] Monitor Reddit API appeal response
+- [ ] If approved: store credentials in Vault, switch to `poll-source` oauth method
 - [ ] Set up `r/MaineMirror` Reddit community
-- [ ] Build moderator web app
+- [ ] Build moderator web app for post approval
 - [ ] Configure pg_cron for automated scheduling
+- [ ] Build RSS adapter as third fetch method option
