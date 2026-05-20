@@ -60,6 +60,33 @@
     .btn-reject:hover { background: #f85149; }
     .btn-approve:disabled, .btn-reject:disabled { background: #444; }
     #queue-summary { color: #8b949e; font-size: 0.85rem; margin-bottom: 4px; min-height: 20px; }
+    /* Admin section */
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .admin-field label { display: block; color: #8b949e; font-size: 0.75rem; margin-bottom: 4px; }
+    .admin-field input, .admin-field select {
+      width: 100%; box-sizing: border-box;
+      background: #161b22; color: #c9d1d9;
+      border: 1px solid #30363d; border-radius: 6px;
+      padding: 8px 10px; font-family: monospace; font-size: 0.8rem;
+    }
+    .admin-field input:focus, .admin-field select:focus { outline: none; border-color: #58a6ff; }
+    .admin-field.full { grid-column: 1 / -1; }
+    #btn-save-admin { background: #6e40c9; margin-bottom: 0; }
+    #btn-save-admin:hover { background: #8957e5; }
+    .admin-status { color: #8b949e; font-size: 0.8rem; margin-top: 8px; min-height: 18px; }
+    .security-note {
+      background: #161b22; border: 1px solid #30363d; border-left: 3px solid #8b949e;
+      border-radius: 6px; padding: 12px 14px; font-size: 0.8rem; color: #8b949e;
+      margin-bottom: 16px; line-height: 1.6;
+    }
+    .security-note a { color: #58a6ff; }
+    .security-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 0.75rem; font-weight: bold; margin-left: 6px; vertical-align: middle;
+    }
+    .badge-low  { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+    .badge-med  { background: #2d2a00; color: #e3b341; border: 1px solid #e3b341; }
+    .badge-high { background: #0d2f17; color: #3fb950; border: 1px solid #3fb950; }
   </style>
 </head>
 <body>
@@ -71,7 +98,6 @@
     <li>Click the <strong>r/Maine &rarr; Copy</strong> bookmarklet</li>
     <li>Come back here and click <strong>Paste &amp; Ingest</strong></li>
   </ol>
-
   <div class="btn-row">
     <button id="btn-ingest" onclick="ingest()" disabled>&#9654; Ingest Posts</button>
     <button id="btn-paste" onclick="pasteFromClipboard()">&#128203; Paste</button>
@@ -94,12 +120,146 @@
   <div id="queue-summary"></div>
   <div id="post-list"></div>
 
-  <script>
-    var SUPABASE_URL   = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
-    var ANON_KEY       = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI';
-    var INGEST_URL     = SUPABASE_URL + '/functions/v1/ingest-posts';
-    var TRANSFORM_URL  = SUPABASE_URL + '/functions/v1/transform-posts';
+  <h2>Admin &mdash; Settings</h2>
+  <p>Configure your environment. Changes are saved to <code>localStorage</code> and applied on next page load.</p>
 
+  <div class="security-note">
+    <strong>Access Control</strong>
+    &mdash; Current mode: <span id="security-mode-label">Anon (no auth)</span><span id="security-badge" class="security-badge badge-low">Low</span><br>
+    This tool uses your Supabase anon key directly. Anyone with the key and knowledge of the API can read or write data.
+    Three security paths are available &mdash; see <a href="security.md" target="_blank">security.md</a> for full guidance on choosing and implementing each.
+    <ul style="margin:8px 0 0 0;padding-left:18px;">
+      <li><strong>Path 1 — Anon:</strong> No login required. Fine for personal tools. Risk is low if the URL is not shared. <span class="security-badge badge-low">Low</span></li>
+      <li><strong>Path 2 — Password gate:</strong> Hardcoded passphrase in the HTML. Stops casual access, not source inspection. <span class="security-badge badge-med">Medium</span></li>
+      <li><strong>Path 3 — Supabase Auth:</strong> Real user login + RLS enforcement. Required if sharing this tool. <span class="security-badge badge-high">High</span></li>
+    </ul>
+  </div>
+
+  <div class="admin-grid">
+    <div class="admin-field full">
+      <label>Supabase Project URL</label>
+      <input type="text" id="admin-url" placeholder="https://your-project-ref.supabase.co">
+    </div>
+    <div class="admin-field full">
+      <label>Anon Key</label>
+      <input type="text" id="admin-key" placeholder="eyJ...">
+    </div>
+    <div class="admin-field">
+      <label>Ingest Function Slug</label>
+      <input type="text" id="admin-ingest-slug" placeholder="ingest-posts">
+    </div>
+    <div class="admin-field">
+      <label>Transform Function Slug</label>
+      <input type="text" id="admin-transform-slug" placeholder="transform-posts">
+    </div>
+    <div class="admin-field full">
+      <label>Security Path</label>
+      <select id="admin-security">
+        <option value="1">Path 1 — Anon (no auth)</option>
+        <option value="2">Path 2 — Password gate</option>
+        <option value="3">Path 3 — Supabase Auth</option>
+      </select>
+    </div>
+    <div class="admin-field full" id="admin-password-row" style="display:none">
+      <label>Passphrase (Path 2 only)</label>
+      <input type="password" id="admin-password" placeholder="Set a passphrase...">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="btn-save-admin" onclick="saveAdmin()">&#128190; Save Settings</button>
+  </div>
+  <div class="admin-status" id="admin-status"></div>
+
+  <script>
+    // ── Config (overridden by localStorage if set) ─────────────────────────
+    var DEFAULTS = {
+      url:            'https://hhyhulqngdkwsxhymmcd.supabase.co',
+      key:            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
+      ingestSlug:     'ingest-posts',
+      transformSlug:  'transform-posts',
+      securityPath:   '1',
+      password:       ''
+    };
+
+    function loadConfig() {
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem('rm_config') || '{}'); } catch(e) {}
+      return Object.assign({}, DEFAULTS, saved);
+    }
+
+    var CFG          = loadConfig();
+    var SUPABASE_URL = CFG.url;
+    var ANON_KEY     = CFG.key;
+    var INGEST_URL   = SUPABASE_URL + '/functions/v1/' + CFG.ingestSlug;
+    var TRANSFORM_URL= SUPABASE_URL + '/functions/v1/' + CFG.transformSlug;
+
+    // ── Path 2 password gate ───────────────────────────────────────────────
+    if (CFG.securityPath === '2' && CFG.password) {
+      var entered = sessionStorage.getItem('rm_auth');
+      if (entered !== CFG.password) {
+        var input = prompt('Enter passphrase:');
+        if (input !== CFG.password) {
+          document.body.innerHTML = '<p style="color:#f85149;font-family:monospace;padding:40px">Access denied.</p>';
+          throw new Error('Unauthorized');
+        }
+        sessionStorage.setItem('rm_auth', input);
+      }
+    }
+
+    // ── Admin panel init ───────────────────────────────────────────────────
+    function initAdmin() {
+      document.getElementById('admin-url').value            = CFG.url;
+      document.getElementById('admin-key').value            = CFG.key;
+      document.getElementById('admin-ingest-slug').value    = CFG.ingestSlug;
+      document.getElementById('admin-transform-slug').value = CFG.transformSlug;
+      document.getElementById('admin-security').value       = CFG.securityPath;
+      document.getElementById('admin-password').value       = CFG.password;
+      togglePasswordRow();
+      updateSecurityBadge();
+    }
+
+    function togglePasswordRow() {
+      var path = document.getElementById('admin-security').value;
+      document.getElementById('admin-password-row').style.display = path === '2' ? 'grid' : 'none';
+    }
+
+    function updateSecurityBadge() {
+      var path  = CFG.securityPath;
+      var label = document.getElementById('security-mode-label');
+      var badge = document.getElementById('security-badge');
+      if (path === '2') {
+        label.textContent = 'Password gate';
+        badge.className = 'security-badge badge-med';
+        badge.textContent = 'Medium';
+      } else if (path === '3') {
+        label.textContent = 'Supabase Auth';
+        badge.className = 'security-badge badge-high';
+        badge.textContent = 'High';
+      } else {
+        label.textContent = 'Anon (no auth)';
+        badge.className = 'security-badge badge-low';
+        badge.textContent = 'Low';
+      }
+    }
+
+    document.getElementById('admin-security').addEventListener('change', togglePasswordRow);
+
+    function saveAdmin() {
+      var newCfg = {
+        url:           document.getElementById('admin-url').value.trim().replace(/\/$/, ''),
+        key:           document.getElementById('admin-key').value.trim(),
+        ingestSlug:    document.getElementById('admin-ingest-slug').value.trim() || 'ingest-posts',
+        transformSlug: document.getElementById('admin-transform-slug').value.trim() || 'transform-posts',
+        securityPath:  document.getElementById('admin-security').value,
+        password:      document.getElementById('admin-password').value
+      };
+      localStorage.setItem('rm_config', JSON.stringify(newCfg));
+      document.getElementById('admin-status').innerHTML = '<span class="ok">\u2714 Saved. Reload the page to apply changes.</span>';
+    }
+
+    initAdmin();
+
+    // ── Helpers ────────────────────────────────────────────────────────────
     function log(targetId, msg, type) {
       if (!type) type = 'inf';
       var el = document.getElementById(targetId);
@@ -115,6 +275,7 @@
       document.getElementById('btn-ingest').disabled = val.length === 0;
     }
 
+    // ── Step 1: Ingest ─────────────────────────────────────────────────────
     async function pasteFromClipboard() {
       try {
         var text = await navigator.clipboard.readText();
@@ -158,6 +319,7 @@
       btn.disabled = false;
     }
 
+    // ── Step 2: Transform ─────────────────────────────────────────────────
     async function transform() {
       var btn = document.getElementById('btn-transform');
       btn.disabled = true;
@@ -178,6 +340,7 @@
       btn.disabled = false;
     }
 
+    // ── Step 3: Approval Queue ─────────────────────────────────────────────
     async function loadQueue() {
       var btn = document.getElementById('btn-load-queue');
       btn.disabled = true;
