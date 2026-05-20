@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RedditMirror &mdash; Ingest Posts</title>
+  <style>
+    body { font-family: monospace; max-width: 680px; margin: 60px auto; padding: 0 20px; background: #0d1117; color: #c9d1d9; }
+    h1 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 4px; }
+    h2 { color: #58a6ff; font-size: 1rem; margin: 32px 0 8px; border-top: 1px solid #21262d; padding-top: 24px; }
+    p  { color: #8b949e; font-size: 0.85rem; margin: 0 0 16px; }
+    ol { color: #8b949e; font-size: 0.85rem; margin: 0 0 20px; padding-left: 20px; line-height: 1.8; }
+    textarea {
+      width: 100%; box-sizing: border-box;
+      background: #161b22; color: #c9d1d9;
+      border: 1px solid #30363d; border-radius: 6px;
+      padding: 12px; font-family: monospace; font-size: 0.8rem;
+      resize: vertical; min-height: 120px;
+      margin-bottom: 12px;
+    }
+    textarea:focus { outline: none; border-color: #58a6ff; }
+    .btn-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    button {
+      flex: 1; background: #238636; color: #fff; border: none;
+      padding: 12px 24px; font-size: 1rem; font-family: monospace;
+      border-radius: 6px; cursor: pointer;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    #btn-paste { background: #1f6feb; flex: 0 0 auto; padding: 12px 16px; }
+    #btn-paste:hover { background: #388bfd; }
+    #btn-transform { background: #6e40c9; }
+    #btn-transform:hover { background: #8957e5; }
+    #btn-transform:disabled { background: #444; }
+    #btn-load-queue { background: #1f6feb; }
+    #btn-load-queue:hover { background: #388bfd; }
+    .log-section {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; padding: 16px; min-height: 60px;
+      font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap;
+      margin-bottom: 8px;
+    }
+    .ok  { color: #3fb950; }
+    .err { color: #f85149; }
+    .inf { color: #8b949e; }
+    #post-list { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .post-card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; padding: 14px 16px;
+    }
+    .post-card.approved { border-color: #238636; opacity: 0.5; }
+    .post-card.rejected { border-color: #f85149; opacity: 0.5; }
+    .post-card strong a { color: #58a6ff; text-decoration: none; font-size: 0.9rem; }
+    .post-card strong a:hover { text-decoration: underline; }
+    .post-meta { color: #8b949e; font-size: 0.75rem; margin: 6px 0 10px; }
+    .card-actions { display: flex; gap: 8px; }
+    .card-actions button { flex: 0 0 auto; padding: 6px 14px; font-size: 0.8rem; }
+    .btn-approve { background: #238636; }
+    .btn-approve:hover { background: #2ea043; }
+    .btn-reject  { background: #b62324; }
+    .btn-reject:hover { background: #f85149; }
+    .btn-approve:disabled, .btn-reject:disabled { background: #444; }
+    #queue-summary { color: #8b949e; font-size: 0.85rem; margin-bottom: 4px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <h1>RedditMirror &mdash; Ingest r/Maine Posts</h1>
+
+  <h2>Step 1 &mdash; Ingest Posts</h2>
+  <ol>
+    <li>Go to <a href="https://www.reddit.com/r/Maine/new" target="_blank" style="color:#58a6ff">reddit.com/r/Maine/new</a> (logged in)</li>
+    <li>Click the <strong>r/Maine &rarr; Copy</strong> bookmarklet</li>
+    <li>Come back here and click <strong>Paste &amp; Ingest</strong></li>
+  </ol>
+
+  <div class="btn-row">
+    <button id="btn-ingest" onclick="ingest()" disabled>&#9654; Ingest Posts</button>
+    <button id="btn-paste" onclick="pasteFromClipboard()">&#128203; Paste</button>
+  </div>
+  <textarea id="json-input" placeholder="Paste Reddit posts JSON here (or use the Paste button above)..." oninput="onInput()"></textarea>
+  <div id="log-ingest" class="log-section"><span class="inf">Ready. Paste your clipboard JSON and click Ingest.</span></div>
+
+  <h2>Step 2 &mdash; Transform Posts</h2>
+  <p>Filters ingested source posts (removes NSFW/spoilers, deduplicates) and queues eligible posts for moderator approval.</p>
+  <div class="btn-row">
+    <button id="btn-transform" onclick="transform()">&#9654; Run transform-posts</button>
+  </div>
+  <div id="log-transform" class="log-section"><span class="inf">Ready. Run after ingesting posts.</span></div>
+
+  <h2>Step 3 &mdash; Review &amp; Approve Posts</h2>
+  <p>Approve or reject each pending post before it gets delivered to Reddit Mirror.</p>
+  <div class="btn-row">
+    <button id="btn-load-queue" onclick="loadQueue()">&#8635; Load Pending Posts</button>
+  </div>
+  <div id="queue-summary"></div>
+  <div id="post-list"></div>
+
+  <script>
+    var SUPABASE_URL   = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
+    var ANON_KEY       = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI4ODA3MTgsImV4cCI6MjAzODQ1NjcxOH0.BWPBW4v6jSRFbMVbdJtZfzqPm0VaxYIyMFlnBi6eFWk';
+    var INGEST_URL     = SUPABASE_URL + '/functions/v1/ingest-posts';
+    var TRANSFORM_URL  = SUPABASE_URL + '/functions/v1/transform-posts';
+
+    function log(targetId, msg, type) {
+      if (!type) type = 'inf';
+      var el = document.getElementById(targetId);
+      el.innerHTML += '<span class="' + type + '">' + msg + '</span>\n';
+    }
+
+    function clearLog(targetId) {
+      document.getElementById(targetId).innerHTML = '';
+    }
+
+    function onInput() {
+      var val = document.getElementById('json-input').value.trim();
+      document.getElementById('btn-ingest').disabled = val.length === 0;
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        var text = await navigator.clipboard.readText();
+        document.getElementById('json-input').value = text;
+        onInput();
+        clearLog('log-ingest');
+        log('log-ingest', 'Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
+      } catch (err) {
+        log('log-ingest', 'Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
+      }
+    }
+
+    async function ingest() {
+      var btn = document.getElementById('btn-ingest');
+      btn.disabled = true;
+      clearLog('log-ingest');
+      var posts;
+      try {
+        posts = JSON.parse(document.getElementById('json-input').value.trim());
+        if (!Array.isArray(posts)) throw new Error('Expected a JSON array of posts.');
+        log('log-ingest', 'Parsed ' + posts.length + ' posts. Sending to ingest-posts...', 'inf');
+      } catch (err) {
+        log('log-ingest', 'Invalid JSON: ' + err.message, 'err');
+        btn.disabled = false;
+        return;
+      }
+      try {
+        var res = await fetch(INGEST_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ posts: posts })
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        log('log-ingest', '\u2714 Ingested ' + data.ingested + ' posts!', 'ok');
+        log('log-ingest', 'Newest cursor: ' + data.newest_cursor, 'inf');
+        log('log-ingest', '\u2192 Run transform-posts below to queue eligible posts.', 'inf');
+      } catch (err) {
+        log('log-ingest', 'Ingest failed: ' + err.message, 'err');
+      }
+      btn.disabled = false;
+    }
+
+    async function transform() {
+      var btn = document.getElementById('btn-transform');
+      btn.disabled = true;
+      clearLog('log-transform');
+      log('log-transform', 'Running transform-posts...', 'inf');
+      try {
+        var res = await fetch(TRANSFORM_URL, { method: 'POST' });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        log('log-transform', '\u2714 ' + data.message, 'ok');
+        if (data.filtered > 0) {
+          log('log-transform', data.filtered + ' posts filtered (NSFW or spoiler).', 'inf');
+        }
+        log('log-transform', '\u2192 Scroll to Step 3 and click Load Pending Posts.', 'inf');
+      } catch (err) {
+        log('log-transform', 'transform-posts failed: ' + err.message, 'err');
+      }
+      btn.disabled = false;
+    }
+
+    async function loadQueue() {
+      var btn = document.getElementById('btn-load-queue');
+      btn.disabled = true;
+      document.getElementById('queue-summary').textContent = 'Loading...';
+      document.getElementById('post-list').innerHTML = '';
+      try {
+        var res = await fetch(
+          SUPABASE_URL + '/rest/v1/synced_posts?status=eq.pending&select=id,source_post_id,source_posts(title,url,author,score,flair_text)&order=id.asc',
+          { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
+        );
+        if (!res.ok) throw new Error(await res.text());
+        var posts = await res.json();
+        var summary = document.getElementById('queue-summary');
+        if (posts.length === 0) {
+          summary.innerHTML = '<span style="color:#3fb950">\u2714 No pending posts &mdash; queue is clear.</span>';
+          btn.disabled = false;
+          return;
+        }
+        summary.textContent = posts.length + ' post' + (posts.length !== 1 ? 's' : '') + ' pending approval';
+        var html = '';
+        for (var i = 0; i < posts.length; i++) {
+          var p  = posts[i];
+          var sp = p.source_posts || {};
+          var flair = sp.flair_text
+            ? '<span style="background:#21262d;padding:2px 6px;border-radius:4px;">' + sp.flair_text + '</span>'
+            : 'no flair';
+          html += '<div class="post-card" id="card-' + p.id + '">' +
+            '<strong><a href="' + (sp.url || '#') + '" target="_blank">' + (sp.title || '(no title)') + '</a></strong>' +
+            '<div class="post-meta">u/' + (sp.author || '?') + ' &nbsp;&middot;&nbsp; score: ' + (sp.score || '?') + ' &nbsp;&middot;&nbsp; ' + flair + '</div>' +
+            '<div class="card-actions">' +
+            '<button class="btn-approve" id="approve-' + p.id + '" onclick="setStatus(\'' + p.id + '\', \'approved\')">&#9989; Approve</button>' +
+            '<button class="btn-reject"  id="reject-'  + p.id + '" onclick="setStatus(\'' + p.id + '\', \'rejected\')">&#10060; Reject</button>' +
+            '</div></div>';
+        }
+        document.getElementById('post-list').innerHTML = html;
+      } catch (err) {
+        document.getElementById('queue-summary').innerHTML = '<span class="err">Failed to load queue: ' + err.message + '</span>';
+      }
+      btn.disabled = false;
+    }
+
+    async function setStatus(id, status) {
+      var approveBtn = document.getElementById('approve-' + id);
+      var rejectBtn  = document.getElementById('reject-'  + id);
+      if (approveBtn) approveBtn.disabled = true;
+      if (rejectBtn)  rejectBtn.disabled  = true;
+      try {
+        var res = await fetch(SUPABASE_URL + '/rest/v1/synced_posts?id=eq.' + id, {
+          method: 'PATCH',
+          headers: {
+            apikey: ANON_KEY,
+            Authorization: 'Bearer ' + ANON_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify({ status: status })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        var card = document.getElementById('card-' + id);
+        if (card) {
+          card.classList.add(status);
+          card.querySelector('.card-actions').innerHTML =
+            '<span style="color:' + (status === 'approved' ? '#3fb950' : '#f85149') + '">' +
+            (status === 'approved' ? '\u2714 Approved' : '\u2716 Rejected') + '</span>';
+        }
+        var pending = document.querySelectorAll('.post-card:not(.approved):not(.rejected)').length;
+        var summary = document.getElementById('queue-summary');
+        if (pending === 0) {
+          summary.innerHTML = '<span style="color:#3fb950">\u2714 All posts reviewed!</span>';
+        } else {
+          summary.textContent = pending + ' post' + (pending !== 1 ? 's' : '') + ' pending approval';
+        }
+      } catch (err) {
+        if (approveBtn) approveBtn.disabled = false;
+        if (rejectBtn)  rejectBtn.disabled  = false;
+        alert('Failed to update status: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
