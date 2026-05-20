@@ -31,6 +31,8 @@
     #btn-transform { background: #6e40c9; }
     #btn-transform:hover { background: #8957e5; }
     #btn-transform:disabled { background: #444; }
+    #btn-load-queue { background: #1f6feb; }
+    #btn-load-queue:hover { background: #388bfd; }
     .log-section {
       background: #161b22; border: 1px solid #30363d;
       border-radius: 6px; padding: 16px; min-height: 60px;
@@ -40,6 +42,26 @@
     .ok  { color: #3fb950; }
     .err { color: #f85149; }
     .inf { color: #8b949e; }
+
+    /* Step 3 post cards */
+    #post-list { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .post-card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; padding: 14px 16px;
+    }
+    .post-card.approved { border-color: #238636; opacity: 0.5; }
+    .post-card.rejected { border-color: #f85149; opacity: 0.5; }
+    .post-card strong a { color: #58a6ff; text-decoration: none; font-size: 0.9rem; }
+    .post-card strong a:hover { text-decoration: underline; }
+    .post-meta { color: #8b949e; font-size: 0.75rem; margin: 6px 0 10px; }
+    .card-actions { display: flex; gap: 8px; }
+    .card-actions button { flex: 0 0 auto; padding: 6px 14px; font-size: 0.8rem; }
+    .btn-approve { background: #238636; }
+    .btn-approve:hover { background: #2ea043; }
+    .btn-reject  { background: #b62324; }
+    .btn-reject:hover  { background: #f85149; }
+    .btn-approve:disabled, .btn-reject:disabled { background: #444; }
+    #queue-summary { color: #8b949e; font-size: 0.85rem; margin-bottom: 4px; min-height: 20px; }
   </style>
 </head>
 <body>
@@ -66,13 +88,24 @@
   </div>
   <div id="log-transform" class="log-section"><span class="inf">Ready. Run after ingesting posts.</span></div>
 
+  <h2>Step 3 — Review &amp; Approve Posts</h2>
+  <p>Approve or reject each pending post before it gets delivered to Reddit Mirror.</p>
+  <div class="btn-row">
+    <button id="btn-load-queue" onclick="loadQueue()">&#8635; Load Pending Posts</button>
+  </div>
+  <div id="queue-summary"></div>
+  <div id="post-list"></div>
+
   <script>
-    const INGEST_URL    = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/ingest-posts';
-    const TRANSFORM_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/transform-posts';
+    const SUPABASE_URL   = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
+    const ANON_KEY       = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI4ODA3MTgsImV4cCI6MjAzODQ1NjcxOH0.BWPBW4v6jSRFbMVbdJtZfzqPm0VaxYIyMFlnBi6eFWk';
+    const INGEST_URL    = `${SUPABASE_URL}/functions/v1/ingest-posts`;
+    const TRANSFORM_URL = `${SUPABASE_URL}/functions/v1/transform-posts`;
 
     function log(targetId, msg, type = 'inf') {
       const el = document.getElementById(targetId);
-      el.innerHTML += `<span class="${type}">${msg}</span>\n`;
+      el.innerHTML += `<span class="${type}">${msg}</span>
+`;
     }
 
     function clearLog(targetId) {
@@ -92,7 +125,8 @@
         clearLog('log-ingest');
         log('log-ingest', 'Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
       } catch (err) {
-        log('log-ingest', 'Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
+        log('log-ingest', 'Clipboard read failed: ' + err.message + '
+Try pasting manually with Ctrl+V.', 'err');
       }
     }
 
@@ -120,9 +154,9 @@
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || res.statusText);
-        log('log-ingest', `\u2714 Ingested ${json.ingested} posts!`, 'ok');
+        log('log-ingest', `✔ Ingested ${json.ingested} posts!`, 'ok');
         log('log-ingest', `Newest cursor: ${json.newest_cursor}`, 'inf');
-        log('log-ingest', `\u2192 Run transform-posts below to queue eligible posts.`, 'inf');
+        log('log-ingest', `→ Run transform-posts below to queue eligible posts.`, 'inf');
       } catch (err) {
         log('log-ingest', 'Ingest failed: ' + err.message, 'err');
       }
@@ -140,15 +174,105 @@
         const res = await fetch(TRANSFORM_URL, { method: 'POST' });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || res.statusText);
-        log('log-transform', `\u2714 ${json.message}`, 'ok');
+        log('log-transform', `✔ ${json.message}`, 'ok');
         if (json.filtered > 0) {
           log('log-transform', `${json.filtered} posts filtered (NSFW or spoiler).`, 'inf');
         }
+        log('log-transform', `→ Scroll to Step 3 and click Load Pending Posts.`, 'inf');
       } catch (err) {
         log('log-transform', 'transform-posts failed: ' + err.message, 'err');
       }
 
       btn.disabled = false;
+    }
+
+    // ── Step 3: Approval Queue ─────────────────────────────────────────────
+
+    async function loadQueue() {
+      const btn = document.getElementById('btn-load-queue');
+      btn.disabled = true;
+      document.getElementById('queue-summary').textContent = 'Loading...';
+      document.getElementById('post-list').innerHTML = '';
+
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/synced_posts?status=eq.pending&select=id,source_post_id,source_posts(title,url,author,score,flair_text)&order=id.asc`,
+          { headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` } }
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const posts = await res.json();
+
+        const summary = document.getElementById('queue-summary');
+        if (posts.length === 0) {
+          summary.innerHTML = '<span style="color:#3fb950">✔ No pending posts — queue is clear.</span>';
+          btn.disabled = false;
+          return;
+        }
+
+        summary.textContent = `${posts.length} post${posts.length !== 1 ? 's' : ''} pending approval`;
+
+        const listEl = document.getElementById('post-list');
+        listEl.innerHTML = posts.map(p => {
+          const sp = p.source_posts ?? {};
+          const flair = sp.flair_text ? `<span style="background:#21262d;padding:2px 6px;border-radius:4px;">${sp.flair_text}</span>` : '';
+          return `
+            <div class="post-card" id="card-${p.id}">
+              <strong><a href="${sp.url ?? '#'}" target="_blank">${sp.title ?? '(no title)'}</a></strong>
+              <div class="post-meta">u/${sp.author ?? '?'} &nbsp;·&nbsp; score: ${sp.score ?? '?'} &nbsp;·&nbsp; ${flair || 'no flair'}</div>
+              <div class="card-actions">
+                <button class="btn-approve" id="approve-${p.id}" onclick="setStatus('${p.id}', 'approved')">✅ Approve</button>
+                <button class="btn-reject"  id="reject-${p.id}"  onclick="setStatus('${p.id}', 'rejected')">❌ Reject</button>
+              </div>
+            </div>`;
+        }).join('');
+
+      } catch (err) {
+        document.getElementById('queue-summary').innerHTML = `<span class="err">Failed to load queue: ${err.message}</span>`;
+      }
+
+      btn.disabled = false;
+    }
+
+    async function setStatus(id, status) {
+      const approveBtn = document.getElementById(`approve-${id}`);
+      const rejectBtn  = document.getElementById(`reject-${id}`);
+      if (approveBtn) approveBtn.disabled = true;
+      if (rejectBtn)  rejectBtn.disabled  = true;
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/synced_posts?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            apikey: ANON_KEY,
+            Authorization: `Bearer ${ANON_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+
+        const card = document.getElementById(`card-${id}`);
+        if (card) {
+          card.classList.add(status);
+          card.querySelector('.card-actions').innerHTML =
+            `<span style="color:${status === 'approved' ? '#3fb950' : '#f85149'}">${status === 'approved' ? '✔ Approved' : '✖ Rejected'}</span>`;
+        }
+
+        // Update summary count
+        const pending = document.querySelectorAll('.post-card:not(.approved):not(.rejected)').length;
+        const summary = document.getElementById('queue-summary');
+        if (pending === 0) {
+          summary.innerHTML = '<span style="color:#3fb950">✔ All posts reviewed!</span>';
+        } else {
+          summary.textContent = `${pending} post${pending !== 1 ? 's' : ''} pending approval`;
+        }
+
+      } catch (err) {
+        if (approveBtn) approveBtn.disabled = false;
+        if (rejectBtn)  rejectBtn.disabled  = false;
+        alert('Failed to update status: ' + err.message);
+      }
     }
   </script>
 </body>
