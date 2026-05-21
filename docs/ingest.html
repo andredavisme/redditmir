@@ -26,14 +26,19 @@
     }
     button:hover { background: #2ea043; }
     button:disabled { background: #444; cursor: not-allowed; }
-    #btn-paste { background: #1f6feb; flex: 0 0 auto; padding: 12px 16px; }
-    #btn-paste:hover { background: #388bfd; }
-    #btn-transform { background: #6e40c9; }
+    #btn-paste        { background: #1f6feb; flex: 0 0 auto; padding: 12px 16px; }
+    #btn-paste:hover  { background: #388bfd; }
+    #btn-paste-post   { background: #1f6feb; flex: 0 0 auto; padding: 12px 16px; }
+    #btn-paste-post:hover { background: #388bfd; }
+    #btn-transform    { background: #6e40c9; }
     #btn-transform:hover { background: #8957e5; }
     #btn-transform:disabled { background: #444; }
-    #btn-load-queue { background: #1f6feb; }
+    #btn-ingest-comments { background: #0a6a3c; }
+    #btn-ingest-comments:hover { background: #0d8a4e; }
+    #btn-ingest-comments:disabled { background: #444; }
+    #btn-load-queue   { background: #1f6feb; }
     #btn-load-queue:hover { background: #388bfd; }
-    #btn-deliver { background: #0a6a3c; }
+    #btn-deliver      { background: #0a6a3c; }
     #btn-deliver:hover { background: #0d8a4e; }
     #btn-deliver:disabled { background: #444; }
     .log-section {
@@ -63,7 +68,6 @@
     .btn-reject:hover { background: #f85149; }
     .btn-approve:disabled, .btn-reject:disabled { background: #444; }
     #queue-summary { color: #8b949e; font-size: 0.85rem; margin-bottom: 4px; min-height: 20px; }
-    /* Admin section */
     .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
     .admin-field label { display: block; color: #8b949e; font-size: 0.75rem; margin-bottom: 4px; }
     .admin-field input, .admin-field select {
@@ -90,12 +94,18 @@
     .badge-low  { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
     .badge-med  { background: #2d2a00; color: #e3b341; border: 1px solid #e3b341; }
     .badge-high { background: #0d2f17; color: #3fb950; border: 1px solid #3fb950; }
+    .notice {
+      background: #161b22; border: 1px solid #30363d; border-left: 3px solid #e3b341;
+      border-radius: 6px; padding: 10px 14px; font-size: 0.8rem; color: #8b949e;
+      margin-bottom: 16px; line-height: 1.6;
+    }
   </style>
 </head>
 <body>
   <h1>RedditMirror &mdash; Ingest r/Maine Posts</h1>
 
-  <h2>Step 1 &mdash; Ingest Posts</h2>
+  <!-- ── STEP 1a: Ingest Post Listing ─────────────────────────────────── -->
+  <h2>Step 1a &mdash; Ingest Post Listing</h2>
   <ol>
     <li>Go to <a href="https://www.reddit.com/r/Maine/new" target="_blank" style="color:#58a6ff">reddit.com/r/Maine/new</a> (logged in)</li>
     <li>Click the <strong>r/Maine &rarr; Copy</strong> bookmarklet</li>
@@ -108,6 +118,26 @@
   <textarea id="json-input" placeholder="Paste Reddit posts JSON here (or use the Paste button above)..." oninput="onInput()"></textarea>
   <div id="log-ingest" class="log-section"><span class="inf">Ready. Paste your clipboard JSON and click Ingest.</span></div>
 
+  <!-- ── STEP 1b: Ingest Comments ──────────────────────────────────────── -->
+  <h2>Step 1b &mdash; Ingest Post + Comments</h2>
+  <div class="notice">
+    <strong>&#9888; Reddit 403 on server-side comment fetch.</strong><br>
+    Reddit blocks all requests from Supabase IPs. Reddit OAuth approval is pending (2 rejections, appeal submitted May 20, 2026).
+    Use the <strong>r/Maine Post &rarr; Copy</strong> bookmarklet on individual post pages to capture comments from your browser session instead.
+  </div>
+  <ol>
+    <li>Navigate to a single post on <a href="https://www.reddit.com/r/Maine" target="_blank" style="color:#58a6ff">reddit.com/r/Maine</a></li>
+    <li>Click the <strong>r/Maine Post &rarr; Copy</strong> bookmarklet</li>
+    <li>Come back here and click <strong>Paste Post + Comments</strong></li>
+  </ol>
+  <div class="btn-row">
+    <button id="btn-ingest-post-comments" onclick="ingestPostComments()" disabled>&#9654; Ingest Post + Comments</button>
+    <button id="btn-paste-post" onclick="pastePostFromClipboard()">&#128203; Paste</button>
+  </div>
+  <textarea id="json-post-input" placeholder="Paste from r/Maine Post \u2192 Copy bookmarklet here..." oninput="onPostInput()"></textarea>
+  <div id="log-ingest-comments" class="log-section"><span class="inf">Ready. Paste from the post bookmarklet and click Ingest Post + Comments.</span></div>
+
+  <!-- ── STEP 2: Transform ─────────────────────────────────────────────── -->
   <h2>Step 2 &mdash; Transform Posts</h2>
   <p>Filters ingested source posts (removes NSFW/spoilers, deduplicates) and queues eligible posts for moderator approval.</p>
   <div class="btn-row">
@@ -115,6 +145,7 @@
   </div>
   <div id="log-transform" class="log-section"><span class="inf">Ready. Run after ingesting posts.</span></div>
 
+  <!-- ── STEP 3: Approve ───────────────────────────────────────────────── -->
   <h2>Step 3 &mdash; Review &amp; Approve Posts</h2>
   <p>Approve or reject each pending post before it gets delivered to Reddit Mirror.</p>
   <div class="btn-row">
@@ -123,6 +154,7 @@
   <div id="queue-summary"></div>
   <div id="post-list"></div>
 
+  <!-- ── STEP 4: Deliver ───────────────────────────────────────────────── -->
   <h2>Step 4 &mdash; Deliver Approved Posts</h2>
   <p>Publishes all approved posts to <code>published_posts</code> and marks them as delivered. Safe to run multiple times &mdash; delivery is idempotent.</p>
   <div class="btn-row">
@@ -130,6 +162,7 @@
   </div>
   <div id="log-deliver" class="log-section"><span class="inf">Ready. Run after approving posts in Step 3.</span></div>
 
+  <!-- ── ADMIN ─────────────────────────────────────────────────────────── -->
   <h2>Admin &mdash; Settings</h2>
   <p>Configure your environment. Changes are saved to <code>localStorage</code> and applied on next page load.</p>
 
@@ -137,11 +170,11 @@
     <strong>Access Control</strong>
     &mdash; Current mode: <span id="security-mode-label">Anon (no auth)</span><span id="security-badge" class="security-badge badge-low">Low</span><br>
     This tool uses your Supabase anon key directly. Anyone with the key and knowledge of the API can read or write data.
-    Three security paths are available &mdash; see <a href="security.md" target="_blank">security.md</a> for full guidance on choosing and implementing each.
+    Three security paths are available &mdash; see <a href="security.md" target="_blank">security.md</a> for full guidance.
     <ul style="margin:8px 0 0 0;padding-left:18px;">
-      <li><strong>Path 1 &mdash; Anon:</strong> No login required. Fine for personal tools. Risk is low if the URL is not shared. <span class="security-badge badge-low">Low</span></li>
-      <li><strong>Path 2 &mdash; Password gate:</strong> Hardcoded passphrase in the HTML. Stops casual access, not source inspection. <span class="security-badge badge-med">Medium</span></li>
-      <li><strong>Path 3 &mdash; Supabase Auth:</strong> Real user login + RLS enforcement. Required if sharing this tool. <span class="security-badge badge-high">High</span></li>
+      <li><strong>Path 1 &mdash; Anon:</strong> No login required. Fine for personal tools. <span class="security-badge badge-low">Low</span></li>
+      <li><strong>Path 2 &mdash; Password gate:</strong> Stops casual access, not source inspection. <span class="security-badge badge-med">Medium</span></li>
+      <li><strong>Path 3 &mdash; Supabase Auth:</strong> Real user login + RLS enforcement. <span class="security-badge badge-high">High</span></li>
     </ul>
   </div>
 
@@ -155,14 +188,18 @@
       <input type="text" id="admin-key" placeholder="eyJ...">
     </div>
     <div class="admin-field">
-      <label>Ingest Function Slug</label>
+      <label>Ingest Posts Slug</label>
       <input type="text" id="admin-ingest-slug" placeholder="ingest-posts">
+    </div>
+    <div class="admin-field">
+      <label>Ingest Comments Slug</label>
+      <input type="text" id="admin-ingest-comments-slug" placeholder="ingest-comments">
     </div>
     <div class="admin-field">
       <label>Transform Function Slug</label>
       <input type="text" id="admin-transform-slug" placeholder="transform-posts">
     </div>
-    <div class="admin-field full">
+    <div class="admin-field">
       <label>Deliver Function Slug</label>
       <input type="text" id="admin-deliver-slug" placeholder="deliver-posts">
     </div>
@@ -185,15 +222,15 @@
   <div class="admin-status" id="admin-status"></div>
 
   <script>
-    // ── Config ─────────────────────────────────────────────────────────────
     var DEFAULTS = {
-      url:           'https://hhyhulqngdkwsxhymmcd.supabase.co',
-      key:           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
-      ingestSlug:    'ingest-posts',
-      transformSlug: 'transform-posts',
-      deliverSlug:   'deliver-posts',
-      securityPath:  '1',
-      password:      ''
+      url:                  'https://hhyhulqngdkwsxhymmcd.supabase.co',
+      key:                  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
+      ingestSlug:           'ingest-posts',
+      ingestCommentsSlug:   'ingest-comments',
+      transformSlug:        'transform-posts',
+      deliverSlug:          'deliver-posts',
+      securityPath:         '1',
+      password:             ''
     };
 
     function loadConfig() {
@@ -202,14 +239,14 @@
       return Object.assign({}, DEFAULTS, saved);
     }
 
-    var CFG           = loadConfig();
-    var SUPABASE_URL  = CFG.url;
-    var ANON_KEY      = CFG.key;
-    var INGEST_URL    = SUPABASE_URL + '/functions/v1/' + CFG.ingestSlug;
-    var TRANSFORM_URL = SUPABASE_URL + '/functions/v1/' + CFG.transformSlug;
-    var DELIVER_URL   = SUPABASE_URL + '/functions/v1/' + CFG.deliverSlug;
+    var CFG                   = loadConfig();
+    var SUPABASE_URL          = CFG.url;
+    var ANON_KEY              = CFG.key;
+    var INGEST_URL            = SUPABASE_URL + '/functions/v1/' + CFG.ingestSlug;
+    var INGEST_COMMENTS_URL   = SUPABASE_URL + '/functions/v1/' + CFG.ingestCommentsSlug;
+    var TRANSFORM_URL         = SUPABASE_URL + '/functions/v1/' + CFG.transformSlug;
+    var DELIVER_URL           = SUPABASE_URL + '/functions/v1/' + CFG.deliverSlug;
 
-    // ── Path 2 password gate ───────────────────────────────────────────────
     if (CFG.securityPath === '2' && CFG.password) {
       var entered = sessionStorage.getItem('rm_auth');
       if (entered !== CFG.password) {
@@ -222,15 +259,15 @@
       }
     }
 
-    // ── Admin panel ────────────────────────────────────────────────────────
     function initAdmin() {
-      document.getElementById('admin-url').value            = CFG.url;
-      document.getElementById('admin-key').value            = CFG.key;
-      document.getElementById('admin-ingest-slug').value    = CFG.ingestSlug;
-      document.getElementById('admin-transform-slug').value = CFG.transformSlug;
-      document.getElementById('admin-deliver-slug').value   = CFG.deliverSlug;
-      document.getElementById('admin-security').value       = CFG.securityPath;
-      document.getElementById('admin-password').value       = CFG.password;
+      document.getElementById('admin-url').value                  = CFG.url;
+      document.getElementById('admin-key').value                  = CFG.key;
+      document.getElementById('admin-ingest-slug').value          = CFG.ingestSlug;
+      document.getElementById('admin-ingest-comments-slug').value = CFG.ingestCommentsSlug;
+      document.getElementById('admin-transform-slug').value       = CFG.transformSlug;
+      document.getElementById('admin-deliver-slug').value         = CFG.deliverSlug;
+      document.getElementById('admin-security').value             = CFG.securityPath;
+      document.getElementById('admin-password').value             = CFG.password;
       togglePasswordRow();
       updateSecurityBadge();
     }
@@ -245,17 +282,11 @@
       var label = document.getElementById('security-mode-label');
       var badge = document.getElementById('security-badge');
       if (path === '2') {
-        label.textContent = 'Password gate';
-        badge.className = 'security-badge badge-med';
-        badge.textContent = 'Medium';
+        label.textContent = 'Password gate'; badge.className = 'security-badge badge-med'; badge.textContent = 'Medium';
       } else if (path === '3') {
-        label.textContent = 'Supabase Auth';
-        badge.className = 'security-badge badge-high';
-        badge.textContent = 'High';
+        label.textContent = 'Supabase Auth'; badge.className = 'security-badge badge-high'; badge.textContent = 'High';
       } else {
-        label.textContent = 'Anon (no auth)';
-        badge.className = 'security-badge badge-low';
-        badge.textContent = 'Low';
+        label.textContent = 'Anon (no auth)'; badge.className = 'security-badge badge-low'; badge.textContent = 'Low';
       }
     }
 
@@ -263,13 +294,14 @@
 
     function saveAdmin() {
       var newCfg = {
-        url:           document.getElementById('admin-url').value.trim().replace(/\/$/, ''),
-        key:           document.getElementById('admin-key').value.trim(),
-        ingestSlug:    document.getElementById('admin-ingest-slug').value.trim() || 'ingest-posts',
-        transformSlug: document.getElementById('admin-transform-slug').value.trim() || 'transform-posts',
-        deliverSlug:   document.getElementById('admin-deliver-slug').value.trim() || 'deliver-posts',
-        securityPath:  document.getElementById('admin-security').value,
-        password:      document.getElementById('admin-password').value
+        url:                document.getElementById('admin-url').value.trim().replace(/\/$/, ''),
+        key:                document.getElementById('admin-key').value.trim(),
+        ingestSlug:         document.getElementById('admin-ingest-slug').value.trim()          || 'ingest-posts',
+        ingestCommentsSlug: document.getElementById('admin-ingest-comments-slug').value.trim() || 'ingest-comments',
+        transformSlug:      document.getElementById('admin-transform-slug').value.trim()       || 'transform-posts',
+        deliverSlug:        document.getElementById('admin-deliver-slug').value.trim()         || 'deliver-posts',
+        securityPath:       document.getElementById('admin-security').value,
+        password:           document.getElementById('admin-password').value
       };
       localStorage.setItem('rm_config', JSON.stringify(newCfg));
       document.getElementById('admin-status').innerHTML = '<span class="ok">&#10004; Saved. Reload the page to apply changes.</span>';
@@ -277,27 +309,21 @@
 
     initAdmin();
 
-    // ── Helpers ────────────────────────────────────────────────────────────
     function log(targetId, msg, type) {
       if (!type) type = 'inf';
-      var el = document.getElementById(targetId);
-      el.innerHTML += '<span class="' + type + '">' + msg + '</span>\n';
+      document.getElementById(targetId).innerHTML += '<span class="' + type + '">' + msg + '</span>\n';
     }
+    function clearLog(targetId) { document.getElementById(targetId).innerHTML = ''; }
 
-    function clearLog(targetId) {
-      document.getElementById(targetId).innerHTML = '';
-    }
-
+    // ── Step 1a helpers ────────────────────────────────────────────────────
     function onInput() {
       var val = document.getElementById('json-input').value.trim();
       document.getElementById('btn-ingest').disabled = val.length === 0;
     }
 
-    // ── Step 1: Ingest ─────────────────────────────────────────────────────
     async function pasteFromClipboard() {
       try {
-        var text = await navigator.clipboard.readText();
-        document.getElementById('json-input').value = text;
+        document.getElementById('json-input').value = await navigator.clipboard.readText();
         onInput();
         clearLog('log-ingest');
         log('log-ingest', 'Clipboard pasted. Click Ingest Posts to proceed.', 'inf');
@@ -316,16 +342,10 @@
         if (!Array.isArray(posts)) throw new Error('Expected a JSON array of posts.');
         log('log-ingest', 'Parsed ' + posts.length + ' posts. Sending to ingest-posts...', 'inf');
       } catch (err) {
-        log('log-ingest', 'Invalid JSON: ' + err.message, 'err');
-        btn.disabled = false;
-        return;
+        log('log-ingest', 'Invalid JSON: ' + err.message, 'err'); btn.disabled = false; return;
       }
       try {
-        var res = await fetch(INGEST_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ posts: posts })
-        });
+        var res  = await fetch(INGEST_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ posts: posts }) });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || res.statusText);
         log('log-ingest', '\u2714 Ingested ' + data.ingested + ' posts!', 'ok');
@@ -337,6 +357,72 @@
       btn.disabled = false;
     }
 
+    // ── Step 1b helpers ────────────────────────────────────────────────────
+    function onPostInput() {
+      var val = document.getElementById('json-post-input').value.trim();
+      document.getElementById('btn-ingest-post-comments').disabled = val.length === 0;
+    }
+
+    async function pastePostFromClipboard() {
+      try {
+        document.getElementById('json-post-input').value = await navigator.clipboard.readText();
+        onPostInput();
+        clearLog('log-ingest-comments');
+        log('log-ingest-comments', 'Clipboard pasted. Click Ingest Post + Comments to proceed.', 'inf');
+      } catch (err) {
+        log('log-ingest-comments', 'Clipboard read failed: ' + err.message + '\nTry pasting manually with Ctrl+V.', 'err');
+      }
+    }
+
+    async function ingestPostComments() {
+      var btn = document.getElementById('btn-ingest-post-comments');
+      btn.disabled = true;
+      clearLog('log-ingest-comments');
+      var payload;
+      try {
+        payload = JSON.parse(document.getElementById('json-post-input').value.trim());
+        if (!payload.post || !Array.isArray(payload.comments)) throw new Error('Expected { post, comments, reddit_id } from bookmarklet.');
+        log('log-ingest-comments', 'Parsed post + ' + payload.comments.length + ' comments.', 'inf');
+      } catch (err) {
+        log('log-ingest-comments', 'Invalid JSON: ' + err.message, 'err'); btn.disabled = false; return;
+      }
+
+      // Ingest the post first (idempotent upsert)
+      try {
+        log('log-ingest-comments', 'Sending post to ingest-posts...', 'inf');
+        var postRes  = await fetch(INGEST_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ posts: [payload.post] }) });
+        var postData = await postRes.json();
+        if (!postRes.ok) throw new Error(postData.error || postRes.statusText);
+        log('log-ingest-comments', '\u2714 Post ingested (reddit_id: ' + payload.reddit_id + ').', 'ok');
+      } catch (err) {
+        log('log-ingest-comments', 'Post ingest failed: ' + err.message, 'err');
+        btn.disabled = false; return;
+      }
+
+      // Then ingest the comments
+      if (payload.comments.length === 0) {
+        log('log-ingest-comments', '\u2139 No comments to ingest (post had 0 comments).', 'inf');
+        btn.disabled = false; return;
+      }
+
+      try {
+        log('log-ingest-comments', 'Sending ' + payload.comments.length + ' comments to ingest-comments...', 'inf');
+        var cRes  = await fetch(INGEST_COMMENTS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reddit_id: payload.reddit_id, comments: payload.comments })
+        });
+        var cData = await cRes.json();
+        if (!cRes.ok) throw new Error(cData.error || cRes.statusText);
+        log('log-ingest-comments', '\u2714 Ingested ' + cData.ingested + ' comments.', 'ok');
+        if (cData.aliases_assigned) log('log-ingest-comments', cData.aliases_assigned + ' aliases assigned/updated.', 'inf');
+        log('log-ingest-comments', '\u2192 Comments are now stored. Run transform-posts to queue the post.', 'inf');
+      } catch (err) {
+        log('log-ingest-comments', 'Comment ingest failed: ' + err.message, 'err');
+      }
+      btn.disabled = false;
+    }
+
     // ── Step 2: Transform ──────────────────────────────────────────────────
     async function transform() {
       var btn = document.getElementById('btn-transform');
@@ -344,13 +430,11 @@
       clearLog('log-transform');
       log('log-transform', 'Running transform-posts...', 'inf');
       try {
-        var res = await fetch(TRANSFORM_URL, { method: 'POST' });
+        var res  = await fetch(TRANSFORM_URL, { method: 'POST' });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || res.statusText);
         log('log-transform', '\u2714 ' + data.message, 'ok');
-        if (data.filtered > 0) {
-          log('log-transform', data.filtered + ' posts filtered (NSFW or spoiler).', 'inf');
-        }
+        if (data.filtered > 0) log('log-transform', data.filtered + ' posts filtered (NSFW or spoiler).', 'inf');
         log('log-transform', '\u2192 Scroll to Step 3 and click Load Pending Posts.', 'inf');
       } catch (err) {
         log('log-transform', 'transform-posts failed: ' + err.message, 'err');
@@ -374,14 +458,12 @@
         var summary = document.getElementById('queue-summary');
         if (posts.length === 0) {
           summary.innerHTML = '<span style="color:#3fb950">\u2714 No pending posts &mdash; queue is clear.</span>';
-          btn.disabled = false;
-          return;
+          btn.disabled = false; return;
         }
         summary.textContent = posts.length + ' post' + (posts.length !== 1 ? 's' : '') + ' pending approval';
         var html = '';
         for (var i = 0; i < posts.length; i++) {
-          var p  = posts[i];
-          var sp = p.source_posts || {};
+          var p = posts[i], sp = p.source_posts || {};
           var flair = sp.flair_text
             ? '<span style="background:#21262d;padding:2px 6px;border-radius:4px;">' + sp.flair_text + '</span>'
             : 'no flair';
@@ -401,19 +483,14 @@
     }
 
     async function setStatus(id, status) {
-      var approveBtn = document.getElementById('approve-' + id);
-      var rejectBtn  = document.getElementById('reject-'  + id);
-      if (approveBtn) approveBtn.disabled = true;
-      if (rejectBtn)  rejectBtn.disabled  = true;
+      var aBtn = document.getElementById('approve-' + id);
+      var rBtn = document.getElementById('reject-'  + id);
+      if (aBtn) aBtn.disabled = true;
+      if (rBtn) rBtn.disabled = true;
       try {
         var res = await fetch(SUPABASE_URL + '/rest/v1/synced_posts?id=eq.' + id, {
           method: 'PATCH',
-          headers: {
-            apikey: ANON_KEY,
-            Authorization: 'Bearer ' + ANON_KEY,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal'
-          },
+          headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({ status: status })
         });
         if (!res.ok) throw new Error(await res.text());
@@ -426,14 +503,11 @@
         }
         var pending = document.querySelectorAll('.post-card:not(.approved):not(.rejected)').length;
         var summary = document.getElementById('queue-summary');
-        if (pending === 0) {
-          summary.innerHTML = '<span style="color:#3fb950">\u2714 All posts reviewed!</span>';
-        } else {
-          summary.textContent = pending + ' post' + (pending !== 1 ? 's' : '') + ' pending approval';
-        }
+        if (pending === 0) summary.innerHTML = '<span style="color:#3fb950">\u2714 All posts reviewed!</span>';
+        else summary.textContent = pending + ' post' + (pending !== 1 ? 's' : '') + ' pending approval';
       } catch (err) {
-        if (approveBtn) approveBtn.disabled = false;
-        if (rejectBtn)  rejectBtn.disabled  = false;
+        if (aBtn) aBtn.disabled = false;
+        if (rBtn) rBtn.disabled = false;
         alert('Failed to update status: ' + err.message);
       }
     }
@@ -445,10 +519,7 @@
       clearLog('log-deliver');
       log('log-deliver', 'Running deliver-posts...', 'inf');
       try {
-        var res = await fetch(DELIVER_URL, {
-          method: 'POST',
-          headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' }
-        });
+        var res  = await fetch(DELIVER_URL, { method: 'POST', headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' } });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || res.statusText);
         if (data.delivered === 0) {
@@ -456,12 +527,8 @@
         } else {
           log('log-deliver', '\u2714 Delivered ' + data.delivered + ' post' + (data.delivered !== 1 ? 's' : '') + ' to published_posts.', 'ok');
         }
-        if (data.failed > 0) {
-          log('log-deliver', data.failed + ' post(s) failed to deliver.', 'err');
-        }
-        if (data.errors && data.errors.length) {
-          data.errors.forEach(function(e) { log('log-deliver', e, 'err'); });
-        }
+        if (data.failed > 0) log('log-deliver', data.failed + ' post(s) failed to deliver.', 'err');
+        if (data.errors && data.errors.length) data.errors.forEach(function(e) { log('log-deliver', e, 'err'); });
       } catch (err) {
         log('log-deliver', 'deliver-posts failed: ' + err.message, 'err');
       }
