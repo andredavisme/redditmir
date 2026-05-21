@@ -9,6 +9,7 @@ A read-only community mirror of [r/Maine](https://www.reddit.com/r/Maine/) publi
 - Stores posts in a private database (Supabase/PostgreSQL)
 - Queues posts for moderator review before publishing
 - Displays approved posts on a read-only community website
+- Shows anonymised comments (usernames replaced with `RedditUserNNN` aliases)
 - Always links back to the original Reddit post
 
 ## What It Does NOT Do
@@ -24,8 +25,8 @@ A read-only community mirror of [r/Maine](https://www.reddit.com/r/Maine/) publi
 - **Backend:** Supabase Edge Functions (Deno/TypeScript)
 - **Database:** PostgreSQL (Supabase)
 - **API:** Reddit OAuth2 (script app, read-only scope)
-- **Ingest Tool:** Static HTML + vanilla JS, hosted on GitHub Pages
-- **Frontend:** Next.js (read-only display) — *in progress*
+- **Ingest Tool:** Static HTML + vanilla JS, hosted on GitHub Pages (`docs/ingest.html`)
+- **Frontend:** Static HTML + vanilla JS, hosted on GitHub Pages (`docs/index.html`)
 
 ## Pipeline Overview
 
@@ -33,19 +34,21 @@ A read-only community mirror of [r/Maine](https://www.reddit.com/r/Maine/) publi
 Reddit r/Maine
     ↓  (bookmarklet copy)
 Ingest Tool (ingest.html)
-    ↓  POST → ingest-posts Edge Function
+    ↓  Step 1: POST → ingest-posts Edge Function
 source_posts table
-    ↓  POST → transform-posts Edge Function
+    ↓  Step 2: POST → transform-posts Edge Function
 synced_posts table (status: pending)
-    ↓  Moderator approves in ingest.html Step 3
+    ↓  Step 3: Moderator approves in ingest.html
 synced_posts table (status: approved)
-    ↓  [NEXT] deliver-posts Edge Function
-Frontend (Next.js)
+    ↓  published_posts view
+Frontend (index.html) ← live at andredavisme.github.io/redditmir
 ```
 
 ## Current Status
 
 See [docs/progress.md](docs/progress.md) for a full session log and [docs/next-steps.md](docs/next-steps.md) for what's ready to build next.
+
+**Live site:** [andredavisme.github.io/redditmir](https://andredavisme.github.io/redditmir)
 
 ## Documentation
 
@@ -62,6 +65,7 @@ This project complies with Reddit's [Responsible Builder Policy](https://support
 - Direct links back to source posts on reddit.com
 - No bulk redistribution or resale of Reddit data
 - Read-only access via manual bookmarklet trigger
+- Usernames anonymised before display
 
 ## Purpose
 

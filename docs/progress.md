@@ -4,6 +4,52 @@ This file is the running session log for the RedditMirror project. Each session 
 
 ---
 
+## Session 2 — May 20, 2026
+
+### What Was Built
+
+**Frontend mirror (docs/index.html — live at andredavisme.github.io/redditmir)**
+- Full post feed pulling from `published_posts` view in Supabase
+- Upvote score, flair, anonymised author alias, time-ago, domain label
+- On-demand comment loading per post (toggle open/close, cached after first load)
+- Comment tree renderer: nested replies with indentation, lightweight Reddit markdown (bold, italic, code, blockquote, links)
+- Alias resolution via `reddit_user_aliases` table with in-memory cache
+- "Load more" pagination (25 posts per page)
+- "View on Reddit" links on every post
+
+**Database additions (Supabase — project: hhyhulqngdkwsxhymmcd)**
+- `published_posts` view: joins `synced_posts` (approved) with `source_posts` for display
+- `reddit_comments` table: stores all comments per post (`reddit_comment_id`, `parent_id`, `author`, `body`, `score`, `depth`, `is_deleted`, `reddit_created_at`, `reddit_post_id`)
+- `reddit_user_aliases` table: maps raw Reddit usernames to anonymised `RedditUserNNN` aliases; 190 aliases total at session close
+- RLS policies added: anon SELECT on `published_posts`, `reddit_comments`, `reddit_user_aliases`
+
+**Ingest tool updates (docs/ingest.html)**
+- Step 4 added: paste comment JSON for a post → writes to `reddit_comments`, auto-creates missing aliases
+
+### What Was Fixed
+
+- **Comments panel not rendering**: `reddit_user_aliases` table had 23 legacy malformed aliases (`RedditUserB`–`RedditUserZ`) from an earlier scheme. These were renumbered to `RedditUser168`–`RedditUser190` via SQL UPDATE.
+- **"Hide Comments" button showing `&#9650;` as literal text**: `closeLabel` used an HTML entity string that was then passed through `escHtml()`, double-encoding it. Fixed by replacing all HTML entity strings in `renderCard()` with literal Unicode characters (`▲`, `💬`, `🔗`).
+
+### Session-End State
+
+| Metric | Value |
+|--------|-------|
+| Posts in published_posts | 6 |
+| Comments in reddit_comments | 135+ |
+| Aliases in reddit_user_aliases | 190 |
+| Frontend | Live and functional |
+| Comment toggle | Working |
+
+### What Is NOT Yet Built
+
+- Automated polling / scheduled ingest (currently manual via bookmarklet)
+- `ingest.html` comment ingestion tied to post approval workflow
+- Supabase Auth for moderator login (currently relies on anon key in localStorage)
+- Pagination in comment ingest (currently limited to 500 comments per fetch)
+
+---
+
 ## Session 1 — May 20, 2026
 
 ### What Was Built
