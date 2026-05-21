@@ -12,6 +12,8 @@
       color: #1c1c1c;
       min-height: 100vh;
     }
+
+    /* ── Header ── */
     .site-header {
       background: #ff4500;
       padding: 0 20px;
@@ -24,166 +26,154 @@
       z-index: 100;
       box-shadow: 0 1px 3px rgba(0,0,0,.2);
     }
-    .site-header .logo {
-      font-weight: 800;
-      color: #fff;
-      font-size: 1.1rem;
-      letter-spacing: -0.5px;
-      text-decoration: none;
-    }
-    .site-header .badge {
-      background: rgba(255,255,255,.2);
-      color: #fff;
-      font-size: 0.7rem;
-      padding: 2px 7px;
-      border-radius: 12px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-    .site-header .spacer { flex: 1; }
-    .site-header .post-count {
-      color: rgba(255,255,255,.8);
-      font-size: 0.8rem;
-    }
-    .sub-header {
-      background: #fff;
-      border-bottom: 1px solid #ccc;
-      padding: 10px 20px;
-    }
-    .sub-header-inner {
-      max-width: 740px;
-      margin: 0 auto;
-    }
-    .sub-header h1 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #1c1c1c;
-    }
-    .sub-header p {
-      font-size: 0.8rem;
-      color: #878a8c;
-      margin-top: 2px;
-    }
-    .feed-wrapper {
-      max-width: 740px;
-      margin: 16px auto;
-      padding: 0 10px;
-    }
+    .site-header .logo { font-weight:800; color:#fff; font-size:1.1rem; letter-spacing:-.5px; text-decoration:none; }
+    .site-header .badge { background:rgba(255,255,255,.2); color:#fff; font-size:.7rem; padding:2px 7px; border-radius:12px; font-weight:600; letter-spacing:.5px; }
+    .site-header .spacer { flex:1; }
+    .site-header .post-count { color:rgba(255,255,255,.8); font-size:.8rem; }
+
+    /* ── Sub-header ── */
+    .sub-header { background:#fff; border-bottom:1px solid #ccc; padding:10px 20px; }
+    .sub-header-inner { max-width:740px; margin:0 auto; }
+    .sub-header h1 { font-size:.95rem; font-weight:700; }
+    .sub-header p  { font-size:.8rem; color:#878a8c; margin-top:2px; }
+
+    /* ── Feed wrapper ── */
+    .feed-wrapper { max-width:740px; margin:16px auto; padding:0 10px; }
+
+    /* ── Post card ── */
     .post-card {
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      margin-bottom: 10px;
-      display: flex;
-      transition: border-color .1s;
+      background:#fff;
+      border:1px solid #ccc;
+      border-radius:4px;
+      margin-bottom:10px;
+      display:flex;
+      flex-direction:column;
+      transition:border-color .1s;
     }
-    .post-card:hover { border-color: #818384; }
+    .post-card:hover { border-color:#818384; }
+
+    .post-row { display:flex; }
+
     .vote-col {
-      width: 40px;
-      background: #f8f9fa;
-      border-radius: 4px 0 0 4px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 8px 0;
-      gap: 2px;
-      flex-shrink: 0;
+      width:40px;
+      background:#f8f9fa;
+      border-radius:4px 0 0 4px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:8px 0;
+      gap:2px;
+      flex-shrink:0;
     }
-    .vote-arrow {
-      width: 24px; height: 24px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 2px;
-      color: #878a8c;
-      font-size: 14px;
-    }
-    .score {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #1c1c1c;
-      text-align: center;
-    }
-    .post-body {
-      flex: 1;
-      padding: 8px 8px 6px;
-      min-width: 0;
-    }
+    .vote-arrow { width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:2px; color:#878a8c; font-size:14px; }
+    .score { font-size:.7rem; font-weight:700; color:#1c1c1c; text-align:center; }
+
+    .post-body { flex:1; padding:8px 8px 6px; min-width:0; }
+
     .post-meta-top {
-      font-size: 0.7rem;
-      color: #878a8c;
-      margin-bottom: 5px;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 4px;
+      font-size:.7rem;
+      color:#878a8c;
+      margin-bottom:5px;
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:4px;
     }
-    .flair {
-      background: #e8f0fe;
-      color: #1155cc;
-      padding: 1px 6px;
-      border-radius: 12px;
-      font-size: 0.65rem;
-      font-weight: 600;
-    }
+    .alias-tag { color:#0079d3; font-weight:600; }
+    .flair { background:#e8f0fe; color:#1155cc; padding:1px 6px; border-radius:12px; font-size:.65rem; font-weight:600; }
+
     .post-title {
-      font-size: 1rem;
-      font-weight: 500;
-      color: #1c1c1c;
-      line-height: 1.35;
-      text-decoration: none;
-      display: block;
-      margin-bottom: 6px;
-      word-break: break-word;
+      font-size:1rem;
+      font-weight:500;
+      color:#1c1c1c;
+      line-height:1.35;
+      text-decoration:none;
+      display:block;
+      margin-bottom:6px;
+      word-break:break-word;
     }
-    .post-title:hover { color: #0079d3; }
-    .post-domain {
-      font-size: 0.75rem;
-      color: #878a8c;
-      margin-bottom: 6px;
-    }
-    .post-actions {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
+    .post-title:hover { color:#0079d3; }
+    .post-domain { font-size:.75rem; color:#878a8c; margin-bottom:6px; }
+
+    .post-actions { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .action-btn {
-      font-size: 0.75rem;
-      color: #878a8c;
-      padding: 4px 8px;
-      border-radius: 2px;
-      cursor: default;
-      font-weight: 700;
-      background: none;
-      border: none;
+      font-size:.75rem;
+      color:#878a8c;
+      padding:4px 8px;
+      border-radius:2px;
+      cursor:pointer;
+      font-weight:700;
+      background:none;
+      border:none;
     }
-    .action-btn:hover { background: #e8e8e8; }
-    .feed-status {
-      text-align: center;
-      padding: 60px 20px;
-      color: #878a8c;
-      font-size: 0.9rem;
+    .action-btn:hover { background:#e8e8e8; }
+    .comments-toggle { color:#0079d3; }
+    .comment-count-badge {
+      background:#f0f0f0;
+      border-radius:10px;
+      padding:1px 7px;
+      font-size:.7rem;
+      color:#555;
+      font-weight:700;
     }
-    .feed-status .big { font-size: 2.5rem; margin-bottom: 12px; }
-    .feed-status strong { color: #1c1c1c; display: block; font-size: 1rem; margin-bottom: 6px; }
-    .load-more-row { text-align: center; padding: 16px; }
-    #btn-load-more {
-      background: #0079d3;
-      color: #fff;
-      border: none;
-      padding: 8px 24px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
+
+    /* ── Comments panel ── */
+    .comments-panel {
+      border-top:1px solid #edeff1;
+      padding:12px 12px 8px 12px;
+      display:none;
     }
-    #btn-load-more:hover { background: #006cbf; }
-    #btn-load-more:disabled { background: #ccc; cursor: not-allowed; }
-    .site-footer {
-      text-align: center;
-      padding: 32px 20px;
-      font-size: 0.75rem;
-      color: #878a8c;
+    .comments-panel.open { display:block; }
+    .comments-loading { font-size:.8rem; color:#878a8c; padding:8px 0; }
+
+    /* ── Comment tree ── */
+    .comment-thread { list-style:none; }
+    .comment-item {
+      padding:6px 0 6px 0;
+      border-top:1px solid #f0f0f0;
     }
-    .site-footer a { color: #0079d3; text-decoration: none; }
+    .comment-item:first-child { border-top:none; }
+    .comment-meta {
+      font-size:.7rem;
+      color:#878a8c;
+      margin-bottom:3px;
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .comment-author { color:#0079d3; font-weight:700; }
+    .comment-score { color:#878a8c; }
+    .comment-body {
+      font-size:.85rem;
+      line-height:1.5;
+      color:#1c1c1c;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .comment-deleted { color:#878a8c; font-style:italic; }
+
+    /* ── Indented replies ── */
+    .comment-replies {
+      margin-left:16px;
+      border-left:2px solid #edeff1;
+      padding-left:10px;
+      margin-top:4px;
+    }
+
+    /* ── States ── */
+    .feed-status { text-align:center; padding:60px 20px; color:#878a8c; font-size:.9rem; }
+    .feed-status .big { font-size:2.5rem; margin-bottom:12px; }
+    .feed-status strong { color:#1c1c1c; display:block; font-size:1rem; margin-bottom:6px; }
+
+    /* ── Load more ── */
+    .load-more-row { text-align:center; padding:16px; }
+    #btn-load-more { background:#0079d3; color:#fff; border:none; padding:8px 24px; border-radius:20px; font-size:.85rem; font-weight:700; cursor:pointer; }
+    #btn-load-more:hover { background:#006cbf; }
+    #btn-load-more:disabled { background:#ccc; cursor:not-allowed; }
+
+    /* ── Footer ── */
+    .site-footer { text-align:center; padding:32px 20px; font-size:.75rem; color:#878a8c; }
+    .site-footer a { color:#0079d3; text-decoration:none; }
   </style>
 </head>
 <body>
@@ -198,7 +188,7 @@
   <div class="sub-header">
     <div class="sub-header-inner">
       <h1>r/Maine &mdash; Community Mirror</h1>
-      <p>Curated posts from the r/Maine subreddit, reviewed before publishing.</p>
+      <p>Curated posts from the r/Maine subreddit, reviewed before publishing. Usernames are anonymised.</p>
     </div>
   </div>
 
@@ -224,74 +214,205 @@
     var totalLoaded  = 0;
     var hasMore      = true;
 
+    // Cache: author (raw) -> alias
+    var aliasCache = {};
+
+    /* ── Utilities ──────────────────────────────────────────── */
+    function escHtml(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
     function domainFrom(url) {
-      try { return '(' + new URL(url).hostname.replace(/^www\./, '') + ')'; }
-      catch(e) { return ''; }
+      try { return '(' + new URL(url).hostname.replace(/^www\./,'') + ')'; } catch(e){return '';}
     }
-
-    function timeAgo(isoStr) {
-      if (!isoStr) return '';
-      var diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-      if (diff < 60)    return diff + 's ago';
-      if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return Math.floor(diff / 86400) + 'd ago';
+    function timeAgo(iso) {
+      if (!iso) return '';
+      var d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (d < 60)    return d + 's ago';
+      if (d < 3600)  return Math.floor(d/60) + 'm ago';
+      if (d < 86400) return Math.floor(d/3600) + 'h ago';
+      return Math.floor(d/86400) + 'd ago';
     }
-
     function scoreLabel(n) {
       if (!n && n !== 0) return '\u2022';
-      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+      if (n >= 1000) return (n/1000).toFixed(1)+'k';
       return n;
     }
 
-    function escHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    /* ── Alias resolution ───────────────────────────────────── */
+    async function fetchAliases(authors) {
+      var unique = authors.filter(function(a){ return a && a !== '[deleted]' && !aliasCache[a]; });
+      if (!unique.length) return;
+      // Batch lookup from reddit_user_aliases
+      var inList = unique.map(function(a){ return '"' + a.replace(/"/g,'') + '"'; }).join(',');
+      try {
+        var res = await fetch(
+          SUPABASE_URL + '/rest/v1/reddit_user_aliases?select=author,alias&author=in.(' + encodeURIComponent('(' + inList + ')') + ')',
+          { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
+        );
+        if (res.ok) {
+          var rows = await res.json();
+          rows.forEach(function(r){ aliasCache[r.author] = r.alias; });
+        }
+      } catch(e) { /* non-fatal */ }
+      // Any authors still not in cache get a fallback display
+      unique.forEach(function(a){ if (!aliasCache[a]) aliasCache[a] = 'RedditUser?'; });
     }
 
-    function renderCard(p) {
-      var redditLink = p.permalink
-        ? 'https://reddit.com' + p.permalink
-        : (p.url || '#');
-      var flair = p.flair_text
-        ? '<span class="flair">' + escHtml(p.flair_text) + '</span> '
-        : '';
-      var isExternalLink = p.url && p.url !== redditLink;
-      return '<div class="post-card">' +
-        '<div class="vote-col">' +
-          '<div class="vote-arrow">&#9650;</div>' +
-          '<div class="score">' + scoreLabel(p.score) + '</div>' +
-          '<div class="vote-arrow">&#9660;</div>' +
+    function alias(author) {
+      if (!author || author === '[deleted]') return '[deleted]';
+      return aliasCache[author] || 'RedditUser?';
+    }
+
+    /* ── Comment tree renderer ──────────────────────────────── */
+    function buildCommentTree(comments) {
+      // comments is flat array with parent_id; build nested map
+      var byId  = {};
+      var roots = [];
+      comments.forEach(function(c){ byId[c.reddit_comment_id] = { data: c, children: [] }; });
+      comments.forEach(function(c) {
+        var node = byId[c.reddit_comment_id];
+        // parent_id is "t1_xxx" or "t3_xxx"
+        var parentCommentId = c.parent_id && c.parent_id.startsWith('t1_') ? c.parent_id.slice(3) : null;
+        if (parentCommentId && byId[parentCommentId]) {
+          byId[parentCommentId].children.push(node);
+        } else {
+          roots.push(node);
+        }
+      });
+      return roots;
+    }
+
+    function renderCommentNode(node) {
+      var c = node.data;
+      var authorDisplay = c.is_deleted ? '[deleted]' : escHtml(alias(c.author));
+      var bodyHtml = c.is_deleted
+        ? '<span class="comment-deleted">[deleted]</span>'
+        : escHtml(c.body || '');
+      var childrenHtml = '';
+      if (node.children.length) {
+        childrenHtml = '<div class="comment-replies">' +
+          node.children.map(renderCommentNode).join('') +
+        '</div>';
+      }
+      return '<div class="comment-item">' +
+        '<div class="comment-meta">' +
+          '<span class="comment-author">' + authorDisplay + '</span>' +
+          '<span class="comment-score">' + scoreLabel(c.score) + ' pts</span>' +
+          '<span>' + timeAgo(c.reddit_created_at) + '</span>' +
         '</div>' +
-        '<div class="post-body">' +
-          '<div class="post-meta-top">' +
-            flair +
-            '<span>u/' + escHtml(p.author || 'unknown') + '</span>' +
-            '<span>&middot;</span>' +
-            '<span>' + timeAgo(p.reddit_created_at || p.published_at) + '</span>' +
-          '</div>' +
-          '<a class="post-title" href="' + escHtml(isExternalLink ? p.url : redditLink) + '" target="_blank" rel="noopener">' +
-            escHtml(p.title || '(no title)') +
-          '</a>' +
-          (isExternalLink ? '<div class="post-domain">' + escHtml(domainFrom(p.url)) + '</div>' : '') +
-          '<div class="post-actions">' +
-            '<a href="' + escHtml(redditLink) + '" target="_blank" rel="noopener" style="text-decoration:none">' +
-              '<button class="action-btn">&#128279; View on Reddit</button>' +
-            '</a>' +
-          '</div>' +
-        '</div>' +
+        '<div class="comment-body">' + bodyHtml + '</div>' +
+        childrenHtml +
       '</div>';
     }
 
+    function renderCommentTree(comments) {
+      if (!comments.length) return '<p class="comments-loading">No comments yet.</p>';
+      var roots = buildCommentTree(comments);
+      return '<div class="comment-thread">' + roots.map(renderCommentNode).join('') + '</div>';
+    }
+
+    /* ── Load comments on demand ────────────────────────────── */
+    async function toggleComments(postId, redditId, btn) {
+      var panel = document.getElementById('comments-' + postId);
+      if (!panel) return;
+
+      if (panel.classList.contains('open')) {
+        panel.classList.remove('open');
+        btn.textContent = btn.getAttribute('data-open-label');
+        return;
+      }
+
+      // If already loaded, just show
+      if (panel.getAttribute('data-loaded') === '1') {
+        panel.classList.add('open');
+        btn.textContent = btn.getAttribute('data-close-label');
+        return;
+      }
+
+      // Fetch from DB
+      panel.innerHTML = '<p class="comments-loading">Loading comments&hellip;</p>';
+      panel.classList.add('open');
+      btn.disabled = true;
+
+      try {
+        var res = await fetch(
+          SUPABASE_URL + '/rest/v1/reddit_comments' +
+          '?select=reddit_comment_id,parent_id,author,body,score,depth,is_deleted,reddit_created_at' +
+          '&reddit_post_id=eq.' + encodeURIComponent(redditId) +
+          '&order=reddit_created_at.asc' +
+          '&limit=500',
+          { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
+        );
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var comments = await res.json();
+
+        // Prefetch aliases for all comment authors
+        var authors = comments.map(function(c){ return c.author; });
+        await fetchAliases(authors);
+
+        panel.innerHTML = renderCommentTree(comments);
+        panel.setAttribute('data-loaded', '1');
+        btn.textContent = btn.getAttribute('data-close-label');
+      } catch(err) {
+        panel.innerHTML = '<p class="comments-loading">Could not load comments.</p>';
+      }
+      btn.disabled = false;
+    }
+
+    /* ── Post card renderer ─────────────────────────────────── */
+    function renderCard(p, postAlias) {
+      var redditLink = p.permalink ? 'https://reddit.com' + p.permalink : (p.url || '#');
+      var isExternal = p.url && p.url !== redditLink;
+      var flair      = p.flair_text ? '<span class="flair">' + escHtml(p.flair_text) + '</span> ' : '';
+      var openLabel  = '&#128172; ' + (p.comment_count || 0) + ' Comments';
+      var closeLabel = '&#9650; Hide Comments';
+
+      return '<div class="post-card" id="post-' + p.id + '">' +
+        '<div class="post-row">' +
+          '<div class="vote-col">' +
+            '<div class="vote-arrow">&#9650;</div>' +
+            '<div class="score">' + scoreLabel(p.score) + '</div>' +
+            '<div class="vote-arrow">&#9660;</div>' +
+          '</div>' +
+          '<div class="post-body">' +
+            '<div class="post-meta-top">' +
+              flair +
+              '<span class="alias-tag">' + escHtml(postAlias) + '</span>' +
+              '<span>&middot;</span>' +
+              '<span>' + timeAgo(p.reddit_created_at || p.published_at) + '</span>' +
+            '</div>' +
+            '<a class="post-title" href="' + escHtml(isExternal ? p.url : redditLink) + '" target="_blank" rel="noopener">' +
+              escHtml(p.title || '(no title)') +
+            '</a>' +
+            (isExternal ? '<div class="post-domain">' + escHtml(domainFrom(p.url)) + '</div>' : '') +
+            '<div class="post-actions">' +
+              '<button class="action-btn comments-toggle"' +
+                ' data-open-label="' + escHtml(openLabel) + '"' +
+                ' data-close-label="' + escHtml(closeLabel) + '"' +
+                ' onclick="toggleComments(\'' + p.id + '\',\'' + escHtml(p.reddit_id || '') + '\',this)">' +
+                openLabel +
+              '</button>' +
+              '<a href="' + escHtml(redditLink) + '" target="_blank" rel="noopener" style="text-decoration:none">' +
+                '<button class="action-btn">&#128279; View on Reddit</button>' +
+              '</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="comments-panel" id="comments-' + p.id + '"></div>' +
+      '</div>';
+    }
+
+    /* ── Main feed loader ───────────────────────────────────── */
     async function loadMore() {
       var btn = document.getElementById('btn-load-more');
       if (btn) btn.disabled = true;
+
       try {
+        // published_posts joined to source_posts via synced_post_id for reddit_id + comment_count
         var res = await fetch(
           SUPABASE_URL + '/rest/v1/published_posts' +
-          '?select=id,title,url,permalink,author,score,flair_text,reddit_created_at,published_at' +
+          '?select=id,synced_post_id,reddit_id,title,url,permalink,author,score,flair_text,reddit_created_at,published_at' +
           '&order=published_at.desc' +
           '&limit=' + PAGE_SIZE + '&offset=' + offset,
           { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
@@ -309,7 +430,34 @@
           return;
         }
 
-        posts.forEach(function(p) { feed.insertAdjacentHTML('beforeend', renderCard(p)); });
+        // Prefetch aliases for all post authors in this batch
+        var authors = posts.map(function(p){ return p.author; });
+        await fetchAliases(authors);
+
+        // Fetch comment counts for this batch
+        var ids = posts.map(function(p){ return p.reddit_id; }).filter(Boolean);
+        var countMap = {};
+        if (ids.length) {
+          try {
+            var cRes = await fetch(
+              SUPABASE_URL + '/rest/v1/reddit_comments' +
+              '?select=reddit_post_id&reddit_post_id=in.(' + ids.map(encodeURIComponent).join(',') + ')' +
+              '&is_deleted=eq.false',
+              { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
+            );
+            if (cRes.ok) {
+              var cRows = await cRes.json();
+              cRows.forEach(function(r){ countMap[r.reddit_post_id] = (countMap[r.reddit_post_id]||0)+1; });
+            }
+          } catch(e) {}
+        }
+
+        posts.forEach(function(p) {
+          p.comment_count = countMap[p.reddit_id] || 0;
+          var postAlias = alias(p.author);
+          feed.insertAdjacentHTML('beforeend', renderCard(p, postAlias));
+        });
+
         totalLoaded += posts.length;
         offset      += posts.length;
         hasMore      = posts.length === PAGE_SIZE;
