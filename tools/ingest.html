@@ -33,6 +33,9 @@
     #btn-transform:disabled { background: #444; }
     #btn-load-queue { background: #1f6feb; }
     #btn-load-queue:hover { background: #388bfd; }
+    #btn-deliver { background: #0a6a3c; }
+    #btn-deliver:hover { background: #0d8a4e; }
+    #btn-deliver:disabled { background: #444; }
     .log-section {
       background: #161b22; border: 1px solid #30363d;
       border-radius: 6px; padding: 16px; min-height: 60px;
@@ -120,6 +123,13 @@
   <div id="queue-summary"></div>
   <div id="post-list"></div>
 
+  <h2>Step 4 &mdash; Deliver Approved Posts</h2>
+  <p>Publishes all approved posts to <code>published_posts</code> and marks them as delivered. Safe to run multiple times &mdash; delivery is idempotent.</p>
+  <div class="btn-row">
+    <button id="btn-deliver" onclick="deliver()">&#9993; Deliver Approved Posts</button>
+  </div>
+  <div id="log-deliver" class="log-section"><span class="inf">Ready. Run after approving posts in Step 3.</span></div>
+
   <h2>Admin &mdash; Settings</h2>
   <p>Configure your environment. Changes are saved to <code>localStorage</code> and applied on next page load.</p>
 
@@ -129,9 +139,9 @@
     This tool uses your Supabase anon key directly. Anyone with the key and knowledge of the API can read or write data.
     Three security paths are available &mdash; see <a href="security.md" target="_blank">security.md</a> for full guidance on choosing and implementing each.
     <ul style="margin:8px 0 0 0;padding-left:18px;">
-      <li><strong>Path 1 — Anon:</strong> No login required. Fine for personal tools. Risk is low if the URL is not shared. <span class="security-badge badge-low">Low</span></li>
-      <li><strong>Path 2 — Password gate:</strong> Hardcoded passphrase in the HTML. Stops casual access, not source inspection. <span class="security-badge badge-med">Medium</span></li>
-      <li><strong>Path 3 — Supabase Auth:</strong> Real user login + RLS enforcement. Required if sharing this tool. <span class="security-badge badge-high">High</span></li>
+      <li><strong>Path 1 &mdash; Anon:</strong> No login required. Fine for personal tools. Risk is low if the URL is not shared. <span class="security-badge badge-low">Low</span></li>
+      <li><strong>Path 2 &mdash; Password gate:</strong> Hardcoded passphrase in the HTML. Stops casual access, not source inspection. <span class="security-badge badge-med">Medium</span></li>
+      <li><strong>Path 3 &mdash; Supabase Auth:</strong> Real user login + RLS enforcement. Required if sharing this tool. <span class="security-badge badge-high">High</span></li>
     </ul>
   </div>
 
@@ -153,11 +163,15 @@
       <input type="text" id="admin-transform-slug" placeholder="transform-posts">
     </div>
     <div class="admin-field full">
+      <label>Deliver Function Slug</label>
+      <input type="text" id="admin-deliver-slug" placeholder="deliver-posts">
+    </div>
+    <div class="admin-field full">
       <label>Security Path</label>
       <select id="admin-security">
-        <option value="1">Path 1 — Anon (no auth)</option>
-        <option value="2">Path 2 — Password gate</option>
-        <option value="3">Path 3 — Supabase Auth</option>
+        <option value="1">Path 1 &mdash; Anon (no auth)</option>
+        <option value="2">Path 2 &mdash; Password gate</option>
+        <option value="3">Path 3 &mdash; Supabase Auth</option>
       </select>
     </div>
     <div class="admin-field full" id="admin-password-row" style="display:none">
@@ -172,12 +186,13 @@
 
   <script>
     var DEFAULTS = {
-      url:            'https://hhyhulqngdkwsxhymmcd.supabase.co',
-      key:            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
-      ingestSlug:     'ingest-posts',
-      transformSlug:  'transform-posts',
-      securityPath:   '1',
-      password:       ''
+      url:           'https://hhyhulqngdkwsxhymmcd.supabase.co',
+      key:           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
+      ingestSlug:    'ingest-posts',
+      transformSlug: 'transform-posts',
+      deliverSlug:   'deliver-posts',
+      securityPath:  '1',
+      password:      ''
     };
 
     function loadConfig() {
@@ -191,6 +206,7 @@
     var ANON_KEY      = CFG.key;
     var INGEST_URL    = SUPABASE_URL + '/functions/v1/' + CFG.ingestSlug;
     var TRANSFORM_URL = SUPABASE_URL + '/functions/v1/' + CFG.transformSlug;
+    var DELIVER_URL   = SUPABASE_URL + '/functions/v1/' + CFG.deliverSlug;
 
     if (CFG.securityPath === '2' && CFG.password) {
       var entered = sessionStorage.getItem('rm_auth');
@@ -209,6 +225,7 @@
       document.getElementById('admin-key').value            = CFG.key;
       document.getElementById('admin-ingest-slug').value    = CFG.ingestSlug;
       document.getElementById('admin-transform-slug').value = CFG.transformSlug;
+      document.getElementById('admin-deliver-slug').value   = CFG.deliverSlug;
       document.getElementById('admin-security').value       = CFG.securityPath;
       document.getElementById('admin-password').value       = CFG.password;
       togglePasswordRow();
@@ -246,12 +263,13 @@
         url:           document.getElementById('admin-url').value.trim().replace(/\/$/, ''),
         key:           document.getElementById('admin-key').value.trim(),
         ingestSlug:    document.getElementById('admin-ingest-slug').value.trim() || 'ingest-posts',
-        transformSlug: document.getElementById('admin-transform-slash').value.trim() || 'transform-posts',
+        transformSlug: document.getElementById('admin-transform-slug').value.trim() || 'transform-posts',
+        deliverSlug:   document.getElementById('admin-deliver-slug').value.trim() || 'deliver-posts',
         securityPath:  document.getElementById('admin-security').value,
         password:      document.getElementById('admin-password').value
       };
       localStorage.setItem('rm_config', JSON.stringify(newCfg));
-      document.getElementById('admin-status').innerHTML = '<span class="ok">\u2714 Saved. Reload the page to apply changes.</span>';
+      document.getElementById('admin-status').innerHTML = '<span class="ok">&#10004; Saved. Reload the page to apply changes.</span>';
     }
 
     initAdmin();
@@ -411,6 +429,35 @@
         if (rejectBtn)  rejectBtn.disabled  = false;
         alert('Failed to update status: ' + err.message);
       }
+    }
+
+    async function deliver() {
+      var btn = document.getElementById('btn-deliver');
+      btn.disabled = true;
+      clearLog('log-deliver');
+      log('log-deliver', 'Running deliver-posts...', 'inf');
+      try {
+        var res = await fetch(DELIVER_URL, {
+          method: 'POST',
+          headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' }
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        if (data.delivered === 0) {
+          log('log-deliver', '\u2139 ' + (data.message || 'No approved posts to deliver.'), 'inf');
+        } else {
+          log('log-deliver', '\u2714 Delivered ' + data.delivered + ' post' + (data.delivered !== 1 ? 's' : '') + ' to published_posts.', 'ok');
+        }
+        if (data.failed > 0) {
+          log('log-deliver', data.failed + ' post(s) failed to deliver.', 'err');
+        }
+        if (data.errors && data.errors.length) {
+          data.errors.forEach(function(e) { log('log-deliver', e, 'err'); });
+        }
+      } catch (err) {
+        log('log-deliver', 'deliver-posts failed: ' + err.message, 'err');
+      }
+      btn.disabled = false;
     }
   </script>
 </body>
