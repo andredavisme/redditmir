@@ -254,8 +254,6 @@
     function renderMarkdown(raw) {
       if (!raw) return '';
       var s = String(raw);
-
-      // Split into lines for block-level processing
       var lines = s.split('\n');
       var out   = [];
       var i     = 0;
@@ -263,7 +261,7 @@
       while (i < lines.length) {
         var line = lines[i];
 
-        // Fenced code block (```)
+        // Fenced code block
         if (/^```/.test(line)) {
           var code = [];
           i++;
@@ -274,7 +272,7 @@
         }
 
         // Blockquote
-        if (/^&gt;/.test(escHtml(line)) || /^>/.test(line)) {
+        if (/^>/.test(line)) {
           var qlines = [];
           while (i < lines.length && /^>/.test(lines[i])) {
             qlines.push(lines[i].replace(/^>\s?/,''));
@@ -284,10 +282,9 @@
           continue;
         }
 
-        // Blank line = paragraph break (skip)
+        // Blank line
         if (!line.trim()) { i++; continue; }
 
-        // Normal paragraph line
         out.push('<p>' + renderInline(line) + '</p>');
         i++;
       }
@@ -296,37 +293,28 @@
     }
 
     function renderInline(s) {
-      // Escape HTML first
       s = escHtml(s);
-      // Inline code `..`
       s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-      // Bold **..** or __..__ 
       s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      s = s.replace(/__([^_]+)__/g,     '<strong>$1</strong>');
-      // Italic *..* or _.._  (single, not double)
+      s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
       s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-      s = s.replace(/_([^_]+)_/g,   '<em>$1</em>');
-      // Strikethrough ~~..~~
+      s = s.replace(/_([^_]+)_/g, '<em>$1</em>');
       s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-      // Markdown links [text](url)
       s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-      // Bare URLs
       s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
       return s;
     }
 
     /* ── Alias resolution ───────────────────────────────────── */
     async function fetchAliases(authors) {
-      // Only look up authors not already cached
       var unique = authors.filter(function(a){ return a && a !== '[deleted]' && !aliasCache[a]; });
       if (!unique.length) return;
 
-      // PostgREST IN filter: author=in.(val1,val2,...)
-      // Values must NOT be quoted for text columns with this syntax
-      var inList = unique.join(',');
+      // Encode each value individually — commas must remain literal for PostgREST IN syntax
+      var inList = unique.map(function(a){ return encodeURIComponent(a); }).join(',');
       try {
         var res = await fetch(
-          SUPABASE_URL + '/rest/v1/reddit_user_aliases?select=author,alias&author=in.(' + encodeURIComponent(inList) + ')',
+          SUPABASE_URL + '/rest/v1/reddit_user_aliases?select=author,alias&author=in.(' + inList + ')',
           { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
         );
         if (res.ok) {
@@ -335,7 +323,6 @@
         }
       } catch(e) { /* non-fatal */ }
 
-      // Authors still missing get a numbered fallback (not '?')
       unique.forEach(function(a){
         if (!aliasCache[a]) aliasCache[a] = 'RedditUser?';
       });
@@ -506,18 +493,17 @@
           return;
         }
 
-        // Prefetch aliases for all post authors in this batch
         var authors = posts.map(function(p){ return p.author; });
         await fetchAliases(authors);
 
-        // Fetch comment counts for this batch
+        // Fetch comment counts — encode each ID individually
         var ids = posts.map(function(p){ return p.reddit_id; }).filter(Boolean);
         var countMap = {};
         if (ids.length) {
           try {
             var cRes = await fetch(
               SUPABASE_URL + '/rest/v1/reddit_comments' +
-              '?select=reddit_post_id&reddit_post_id=in.(' + ids.map(encodeURIComponent).join(',') + ')' +
+              '?select=reddit_post_id&reddit_post_id=in.(' + ids.map(function(id){ return encodeURIComponent(id); }).join(',') + ')' +
               '&is_deleted=eq.false',
               { headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY } }
             );
