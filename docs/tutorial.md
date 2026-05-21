@@ -1,166 +1,245 @@
-# RedditMirror — Tutorial
-## How to Mirror Any Subreddit to a New Reddit Community
+# RedditMirror — Tutorial & Setup Guide
 
-This tutorial documents how to build an automated system that polls a source subreddit, queues posts for moderation, and delivers them to a new target community.
-
-It also documents something equally important: **how to work through technical roadblocks**. This project ran into seven distinct blockers in a single session. None of them were dead ends. Each one had a path forward — sometimes forward meant sideways.
+This guide walks through the full RedditMirror pipeline: from capturing a Reddit post in your browser to displaying it (with anonymised comments) on the public mirror feed.
 
 ---
 
-## A Note on Problem-Solving in Real Projects
+## Architecture Overview
 
-When you hit a wall, the instinct is to keep pushing at it harder. Often the better move is to **step back and ask what you actually need**, not what you originally planned to do.
-
-In this project:
-- We needed Reddit data → planned to use the API → API required approval → approval was rejected twice
-- At that point we didn’t need the API — we needed *the data*. Those are different things.
-- A browser-based fetch with session cookies gets the same data, no approval required
-
-That reframe — from "how do I fix the API problem" to "how do I get the data" — is the key mental move. Work backward from what you actually need, not forward from the solution you assumed.
-
-**The pattern:**
-1. Try the ideal solution
-2. When blocked, identify *what you actually need* (not the solution, the underlying goal)
-3. Find the next-best path that satisfies that need
-4. Design so you can swap back to the ideal when it becomes available
-
-Step 4 is what the [fetch adapter pattern](#the-fetch-adapter-pattern) in this project implements.
+```
+Browser (you, logged into Reddit)
+    ↓  Bookmarklet captures post + comments
+Ingest Tool (ingest.html — local or hosted)
+    ↓  POST → ingest-posts + ingest-comments
+Database (source_posts + reddit_comments)
+    ↓  transform-posts Edge Function
+synced_posts (status: pending)
+    ↓  Moderator approves in ingest.html
+synced_posts (status: approved)
+    ↓  deliver-posts Edge Function
+published_posts + discussion_threads
+    ↓
+Public Mirror Feed (index.html)
+```
 
 ---
 
 ## Prerequisites
 
-- A [Supabase](https://supabase.com) account (free tier works)
-- A Reddit account (your personal account)
-- A dedicated Reddit bot account (separate from your personal account)
-- Basic comfort with terminals and copy/pasting commands
+- A Supabase project (project ID: `hhyhulqngdkwsxhymmcd`)
+- Access to the GitHub repo: [andredavisme/redditmir](https://github.com/andredavisme/redditmir)
+- A modern browser (Chrome or Firefox recommended)
+- VS Code or any text editor
 
 ---
 
-## Phase 3: Connecting to Reddit Data
+## Step 1 — Install the Bookmarklet
 
-### The Fetch Adapter Pattern
+The bookmarklet runs in your browser while you're on a Reddit post page. It captures both the post data and the comment thread visible in your browser session.
 
-Before building anything, design for swappability. The pipeline has one step that touches Reddit — fetching new posts. Everything downstream (transform, approve, deliver) doesn’t care *how* the posts got into `source_posts`, only that they’re there.
+1. Open `bookmarklets/` in the repo
+2. Copy the bookmarklet code
+3. Create a new bookmark in your browser
+4. Paste the code as the URL
+5. Name it something like `Mirror Post`
 
-So the fetch step is isolated behind an adapter interface. Three implementations exist:
+**What the bookmarklet captures:**
+- Post title, URL, permalink, author, score, flair, timestamp
+- Full visible comment tree (`data[1]` from Reddit's JSON response)
+- All of this happens client-side — your Reddit session cookies are used automatically
 
-| Method | How it works | When to use |
-|---|---|---|
-| `browser` | You run a tool in your browser; your session fetches Reddit | API not yet approved |
-| `oauth` | `poll-source` edge function uses Reddit OAuth credentials | After API approval |
-| `rss` | `poll-source` parses Reddit’s RSS feed | OAuth blocked, want automation |
-
-One env variable (`REDDIT_FETCH_METHOD`) controls which is active. Switching methods requires no code changes.
-
----
-
-### Step 1 — Try Reddit OAuth First
-
-The ideal solution is automated OAuth polling. Attempt this first:
-
-1. Go to [reddit.com/r/reddit.com/wiki/api](https://www.reddit.com/r/reddit.com/wiki/api)
-2. Click **"submit a request"** and fill in the form
-3. Be specific: include your GitHub repo URL, describe read-only access, mention attribution
-
-**If approved:** See Steps 3–5 for credential setup. You’re done.
-
-**If rejected (common):** Don’t resubmit immediately. Reply to the rejection email directly, ask specifically what policy was violated. Then proceed to Step 2 as your working path while you wait.
-
-> ⚠️ The "create app" button at `reddit.com/prefs/apps` silently fails until approval is granted. `old.reddit.com/prefs/apps` has the same wall. This is expected.
+> **Why client-side only?**  
+> Reddit blocks server-side requests from datacenter IPs (including Supabase Edge Functions) with a 403 error. All direct Reddit API attempts from the server return 403 regardless of User-Agent. Reddit OAuth approval is pending (2 submissions rejected, appeal in process as of May 20, 2026). Until OAuth is approved, all Reddit data must be fetched from a real browser session.
 
 ---
 
-### Step 2 — Browser Ingest (working path while OAuth is pending)
+## Step 2 — Capture a Post
 
-Reddit’s JSON endpoints block requests from datacenter IPs (Supabase, Cloudflare, Vercel) but work fine from real browsers. Your logged-in browser session carries cookies that authenticate the request without any API approval.
-
-The browser ingest flow:
-1. A tool running in your browser fetches `r/[subreddit]/new.json` using your session
-2. It POSTs the post array to the `ingest-posts` edge function
-3. `ingest-posts` upserts into `source_posts` identically to how `poll-source` would
-
-**Roadblocks you’ll hit and how to handle them:**
-
-**Bookmarklet blocked by Reddit CSP**  
-Reddit enforces a `connect-src` Content Security Policy that blocks outbound fetch calls to non-Reddit domains. A bookmarklet running on reddit.com can fetch Reddit data fine but cannot POST to Supabase. Solution: don’t POST from Reddit’s page — use a local HTML file instead, which has no CSP.
-
-**`about:blank` tabs inherit opener CSP**  
-If you open a blank tab programmatically from a Reddit page, it inherits Reddit’s CSP context. A truly fresh `about:blank` tab (typed manually in the address bar) does not. But even then, Reddit session cookies may not travel to a blank context. Solution: two-step approach — fetch on Reddit, deliver to Supabase separately.
-
-See `tools/ingest.html` and `docs/bookmarklets.md` for the current working implementation.
+1. Navigate to any post on `reddit.com/r/Maine`
+2. **Expand the comments you want to capture** — the bookmarklet only captures what Reddit has rendered in the DOM
+3. Click the `Mirror Post` bookmarklet
+4. A confirmation message appears with the post title and comment count
+5. The data is held in memory, ready to send
 
 ---
 
-### Step 3 — Create a Bot Account
+## Step 3 — Send to Ingest Tool
 
-Required for OAuth path. Reddit requires a dedicated account for API automation.
-
-1. Open an **incognito/private browser window**
-2. Go to [reddit.com/register](https://www.reddit.com/register) and create a new account
-3. **Do not enable 2FA** — script-type OAuth apps require username/password auth
-4. Use this account when completing the API registration form
-
----
-
-### Step 4 — Create a Reddit App (after OAuth approval)
-
-1. Log in as your **bot account**
-2. Go to [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps)
-3. Click **"create another app"**, select type **script**, set redirect URI to `http://localhost:8080`
-4. Copy your **`client_id`** (short string under app name) and **`client_secret`**
+1. Open `ingest.html` (either locally or at the admin URL)
+2. The tool will show the captured post in Step 1
+3. Click **Ingest Post** — this POSTs to `ingest-posts` edge function
+4. If comments were captured, click **Ingest Comments** — this POSTs to `ingest-comments` edge function
+5. Both upsert safely — re-ingesting the same post/comments is idempotent
 
 ---
 
-### Step 5 — Get a Refresh Token and Store in Vault
+## Step 4 — Transform
 
-```bash
-curl -X POST https://www.reddit.com/api/v1/access_token \
-  -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \
-  -d "grant_type=password&username=YOUR_BOT_USERNAME&password=YOUR_BOT_PASSWORD" \
-  -H "User-Agent: RedditMirror/1.0 (by /u/YOUR_BOT_USERNAME)"
+Click **Run Transform** in Step 2 of ingest.html, or trigger manually:
+
+```
+POST https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/transform-posts
 ```
 
-Store secrets in Supabase Vault:
+This moves eligible posts from `source_posts` → `synced_posts` with `status = 'pending'`.
 
-```sql
-SELECT vault.create_secret('YOUR_CLIENT_SECRET', 'reddit_client_secret');
-SELECT vault.create_secret('YOUR_REFRESH_TOKEN', 'reddit_refresh_token');
+Posts are filtered out if:
+- Marked NSFW or spoiler
+- Score below minimum threshold
+- Already in `synced_posts`
+
+---
+
+## Step 5 — Review & Approve
+
+In Step 3 of ingest.html:
+
+1. Pending posts appear in a queue
+2. Review each post — title, flair, score, original Reddit link
+3. Click **Approve** or **Reject**
+4. Approved posts move to `status = 'approved'`
+
+---
+
+## Step 6 — Deliver
+
+Trigger delivery manually or via cron:
+
+```
+POST https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/deliver-posts
 ```
 
-Then insert the `reddit_credentials` row using the returned Vault UUIDs. See `docs/dev-log.md` for the full INSERT statement.
+This writes approved posts to `published_posts`, making them visible on the public feed.
 
 ---
 
-### Step 6 — Switch the Fetch Method
+## Step 7 — View the Feed
 
-When OAuth credentials are ready:
+The public mirror is at:  
+**[andredavisme.github.io/redditmir](https://andredavisme.github.io/redditmir)**
 
-1. Go to Supabase Dashboard → Edge Functions → Secrets
-2. Set `REDDIT_FETCH_METHOD` = `oauth`
-3. `poll-source` takes over — `ingest-posts` stays deployed as a manual fallback
+Each post card shows:
+- Anonymised author alias (e.g. `RedditUserA`, `RedditUser042`)
+- Score, flair, time ago
+- Collapsible comment thread (lazy-loaded on click)
+- Link back to original Reddit post
 
 ---
 
-### Troubleshooting
+## Comment Ingest via Bookmarklet
 
-| Error | Cause | Fix |
+> **Current status:** Comment fetching from the server is blocked (Reddit 403 on all Supabase IPs). Comments must be captured client-side at bookmarklet time.
+
+### How it works
+
+When you click the bookmarklet on a Reddit post page, Reddit's page already contains `window.__REDUX_STORE__` or the JSON response at `{post_url}.json` which includes both the post (`data[0]`) and comments (`data[1]`). The bookmarklet fetches this and extracts the full comment tree.
+
+### What gets captured
+- All top-level comments and nested replies visible in `data[1]`
+- Per comment: `id`, `parent_id`, `author`, `body`, `score`, `created_utc`, `depth`
+- Reddit only returns ~200 top-level comments by default; "load more" comments require additional fetches (not yet implemented)
+
+### What does NOT get captured
+- Comments hidden behind "load more" / `MoreComments` objects
+- Comments on posts you haven't navigated to
+- Comments added after you ran the bookmarklet
+
+### Updating comments
+
+To refresh comments on a previously ingested post:
+1. Navigate back to the Reddit post
+2. Click the bookmarklet again
+3. In ingest.html, click **Update Comments** — this re-upserts on `reddit_comment_id`, so existing comments are updated and new ones added
+
+---
+
+## Username Anonymisation
+
+All Reddit usernames are replaced with anonymous aliases before display. Raw usernames are stored in the database but never exposed publicly.
+
+| Condition | Alias assigned |
+|---|---|
+| New author (< 5 appearances) | `RedditUserA` – `RedditUserZ` (session, recycled) |
+| Author with 5+ appearances | `RedditUser001`, `RedditUser002`, … (permanent, never recycled) |
+| Deleted account | `[deleted]` |
+
+Alias assignment happens automatically during comment ingest. The public feed reads aliases from `reddit_user_aliases` at render time.
+
+---
+
+## Reddit OAuth — Current Status
+
+> As of May 20, 2026, Reddit OAuth access has been **denied twice** and an **appeal is in process**.
+
+### Timeline
+| Date | Event |
+|---|---|
+| May 2026 | First OAuth app submission — rejected (insufficient detail) |
+| May 2026 | Second submission with GitHub repo link — rejected (Responsible Builder Policy, no specific reason given) |
+| May 20, 2026 | Appeal email submitted to Reddit |
+| Pending | Awaiting Reddit response |
+
+### Impact
+Without OAuth approval:
+- `poll-source` cannot fetch posts automatically (403 from Supabase IPs)
+- `fetch-comments` cannot fetch comments automatically (same 403)
+- All Reddit data must be captured manually via bookmarklet in a live browser session
+
+### When OAuth is approved
+1. Register the app at `reddit.com/prefs/apps` (script type, read-only scope)
+2. Store `client_id` in `reddit_credentials` table
+3. Store `client_secret` and `refresh_token` in Supabase Vault
+4. Set `REDDIT_FETCH_METHOD=oauth` in Edge Function secrets
+5. `poll-source` and `fetch-comments` will activate automatically
+
+---
+
+## Troubleshooting
+
+### Reddit 403 on fetch-comments
+Expected. Reddit blocks all server-side requests from datacenter IPs. Use the bookmarklet to capture comments client-side instead. See "Comment Ingest via Bookmarklet" above.
+
+### PowerShell syntax errors running curl commands
+PowerShell uses different syntax than bash. Use `Invoke-RestMethod` instead:
+```powershell
+Invoke-RestMethod -Uri "https://hhyhulqngdkwsxhymmcd.supabase.co/functions/v1/fetch-comments" -Method GET | ConvertTo-Json -Depth 5
+```
+
+### Edge function 500 errors
+Check logs in the Supabase dashboard under Edge Functions → Logs. Common causes:
+- Supabase client `.not("id", "in", subquery)` — use two-step JS filter instead
+- Missing `source_post_id` on reddit_comments insert
+- `reddit_comment_id` conflict not handled (use `upsert` with `onConflict`)
+
+### Aliases showing as `RedditUser?` in feed
+The alias fetch URL in `index.html` has an encoding bug on the `in.()` filter. Fix in progress.
+
+---
+
+## Environment Variables (Edge Functions)
+
+| Variable | Value | Notes |
 |---|---|---|
-| 403 from Reddit in poll-source | Datacenter IP blocked | Use browser ingest method |
-| "create app" button does nothing | API not yet approved | Complete Step 1 registration |
-| First/second API request rejected | Insufficient detail | Reply to rejection email; use browser ingest in the meantime |
-| Bookmarklet "Failed to fetch" to Supabase | Reddit CSP blocks outbound requests | Use local HTML tool instead |
-| `about:blank` popup can't fetch Reddit | CSP inherited from opener or cookies don't travel | Use two-step: fetch on Reddit, POST separately |
-| `No active Reddit credentials` from deliver-posts | Credentials not inserted yet | Complete Steps 4–5 |
-| Supabase `.not(id, in, subquery)` UUID error | Client doesn't support subqueries | Use two-step JS filter in memory |
+| `SUPABASE_URL` | Auto-set | Injected by Supabase runtime |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-set | Injected by Supabase runtime |
+| `REDDIT_FETCH_METHOD` | `browser` / `oauth` | Switches ingest path |
 
 ---
 
-## Coming Up — Phase 4
+## Repository Structure
 
-- Resolve browser ingest path fully
-- First end-to-end pipeline test: ingest → transform → approve → deliver
-- Create `r/MaineMirror` community on Reddit
-- Build moderator web app for post approval queue
-- Configure `pg_cron` for automated scheduling
-- Build RSS adapter as third fetch method
+```
+redditmir/
+├── README.md
+├── bookmarklets/        # Browser bookmarklet source
+├── docs/
+│   ├── index.html       # Public mirror feed (GitHub Pages)
+│   ├── ingest.html      # Admin ingest tool
+│   ├── tutorial.md      # This file
+│   ├── dev-log.md       # Full development log + roadblock history
+│   ├── next-steps.md    # Prioritised backlog
+│   ├── security.md      # Access control + environment setup
+│   ├── cors.md          # CORS configuration notes
+│   └── bookmarklets.md  # Bookmarklet usage guide
+└── tools/               # Supporting scripts
+```
