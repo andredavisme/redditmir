@@ -429,15 +429,15 @@
       var redditLink = p.permalink ? 'https://reddit.com' + p.permalink : (p.url || '#');
       var isExternal = p.url && p.url !== redditLink;
       var flair      = p.flair_text ? '<span class="flair">' + escHtml(p.flair_text) + '</span> ' : '';
-      var openLabel  = '&#128172; ' + (p.comment_count || 0) + ' Comments';
-      var closeLabel = '&#9650; Hide Comments';
+      var openLabel  = '💬 ' + (p.comment_count || 0) + ' Comments';
+      var closeLabel = '▲ Hide Comments';
 
       return '<div class="post-card" id="post-' + p.id + '">' +
         '<div class="post-row">' +
           '<div class="vote-col">' +
-            '<div class="vote-arrow">&#9650;</div>' +
+            '<div class="vote-arrow">▲</div>' +
             '<div class="score">' + scoreLabel(p.score) + '</div>' +
-            '<div class="vote-arrow">&#9660;</div>' +
+            '<div class="vote-arrow">▼</div>' +
           '</div>' +
           '<div class="post-body">' +
             '<div class="post-meta-top">' +
@@ -458,7 +458,7 @@
                 openLabel +
               '</button>' +
               '<a href="' + escHtml(redditLink) + '" target="_blank" rel="noopener" style="text-decoration:none">' +
-                '<button class="action-btn">&#128279; View on Reddit</button>' +
+                '<button class="action-btn">🔗 View on Reddit</button>' +
               '</a>' +
             '</div>' +
           '</div>' +
@@ -486,7 +486,7 @@
 
         if (offset === 0 && posts.length === 0) {
           feed.innerHTML =
-            '<div class="feed-status"><div class="big">&#128248;</div>' +
+            '<div class="feed-status"><div class="big">📸</div>' +
             '<strong>No posts yet</strong>' +
             'Check back soon &mdash; posts are reviewed before appearing here.</div>';
           document.getElementById('load-more-row').style.display = 'none';
@@ -531,7 +531,7 @@
       } catch(err) {
         if (offset === 0) {
           document.getElementById('feed').innerHTML =
-            '<div class="feed-status"><div class="big">&#9888;</div>' +
+            '<div class="feed-status"><div class="big">⚠</div>' +
             '<strong>Could not load posts</strong>' + escHtml(err.message) + '</div>';
         }
         console.error('Feed error:', err);
