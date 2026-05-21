@@ -169,7 +169,7 @@
   <div class="security-note">
     <strong>Access Control</strong>
     &mdash; Current mode: <span id="security-mode-label">Anon (no auth)</span><span id="security-badge" class="security-badge badge-low">Low</span><br>
-    This tool uses your Supabase anon key directly. Anyone with the key and knowledge of the API can read or write data.
+    This tool uses your Supabase publishable key directly. Anyone with the key and knowledge of the API can read or write data.
     Three security paths are available &mdash; see <a href="security.md" target="_blank">security.md</a> for full guidance.
     <ul style="margin:8px 0 0 0;padding-left:18px;">
       <li><strong>Path 1 &mdash; Anon:</strong> No login required. Fine for personal tools. <span class="security-badge badge-low">Low</span></li>
@@ -184,8 +184,8 @@
       <input type="text" id="admin-url" placeholder="https://your-project-ref.supabase.co">
     </div>
     <div class="admin-field full">
-      <label>Anon Key</label>
-      <input type="text" id="admin-key" placeholder="eyJ...">
+      <label>Publishable Key</label>
+      <input type="text" id="admin-key" placeholder="sb_publishable_...">
     </div>
     <div class="admin-field">
       <label>Ingest Posts Slug</label>
@@ -224,7 +224,7 @@
   <script>
     var DEFAULTS = {
       url:                  'https://hhyhulqngdkwsxhymmcd.supabase.co',
-      key:                  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI',
+      key:                  'sb_publishable_haKvwV0M7KMj4Qz69M6WGg_KmIfU-aI',
       ingestSlug:           'ingest-posts',
       ingestCommentsSlug:   'ingest-comments',
       transformSlug:        'transform-posts',
@@ -519,7 +519,7 @@
       clearLog('log-deliver');
       log('log-deliver', 'Running deliver-posts...', 'inf');
       try {
-        var res  = await fetch(DELIVER_URL, { method: 'POST', headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' } });
+        var res  = await fetch(DELIVER_URL, { method: 'POST', headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json' } });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || res.statusText);
         if (data.delivered === 0) {
