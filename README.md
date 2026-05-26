@@ -105,4 +105,4 @@ Built to give Maine residents a clean, accessible way to stay informed about loc
 
 ## Author
 
-André Davis — [207 Analytix](https://207analytix.com) — York Harbor, Maine
+André Davis — [207 Analytix](https://207analytix.com) — Westbrook, Maine
